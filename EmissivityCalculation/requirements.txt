@@ -1,0 +1,9 @@
+torch
+transformers
+opencv-python
+numpy
+pandas
+pillow
+# pyzed is NOT pip-installable: it ships with the ZED SDK.
+# Install the SDK from https://www.stereolabs.com/developers/release/
+# then run the SDK's get_python_api.py (requires NVIDIA GPU + CUDA).
