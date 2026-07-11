@@ -100,6 +100,26 @@ def voxelize_octree(points: np.ndarray, labels: np.ndarray, depth: int) -> Voxel
     return _grid_from_index(idx, labels, voxel_size, origin)
 
 
+def filter_by_count(grid: VoxelGrid, min_count: int) -> VoxelGrid:
+    """Keep only voxels with at least `min_count` points (a density filter).
+
+    Drops sparse voxels — often isolated LiDAR returns or scan noise that show
+    up as disconnected boxes in the viewer. This is a per-voxel threshold only:
+    it does not check spatial connectivity, so a voxel with min_count+ points
+    that has no occupied neighbours can still remain isolated after filtering.
+    """
+    if min_count <= 1:
+        return grid
+    mask = grid.counts >= min_count
+    return VoxelGrid(
+        centers=grid.centers[mask],
+        labels=grid.labels[mask],
+        counts=grid.counts[mask],
+        voxel_size=grid.voxel_size,
+        origin=grid.origin,
+    )
+
+
 def verify_nonempty(grid: "VoxelGrid", n_points: int) -> tuple[bool, int, int]:
     """Check the voxel invariant after a (re)voxelization.
 
