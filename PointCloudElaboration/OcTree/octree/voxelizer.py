@@ -1,0 +1,136 @@
+"""Fast voxel sampling of a point cloud (numpy).
+
+Each point is mapped to an integer 3-D cell index
+    idx = floor((xyz - origin) / voxel_size)
+and points sharing a cell collapse to a single voxel. For each occupied voxel
+we return its cell-center coordinate, the majority semantic class of the points
+it contains, and the number of points it absorbed.
+
+Two lattices are provided:
+- `voxelize`        : origin at the cloud's min corner (a plain uniform grid).
+- `voxelize_octree` : origin at the centered bounding *cube*, edge
+                      root_extent / 2**depth, with the far boundary folded into
+                      the last cell. This reproduces exactly the set of occupied
+                      leaves of a complete octree at that depth (see octree.py),
+                      and is what the viewer draws.
+"""
+
+from dataclasses import dataclass
+
+import numpy as np
+
+from .classes import MAX_CLASS_ID
+
+
+@dataclass
+class VoxelGrid:
+    centers: np.ndarray  # (M, 3) float, voxel cell centers
+    labels: np.ndarray  # (M,) int, majority class per voxel
+    counts: np.ndarray  # (M,) int, points per voxel
+    voxel_size: float
+    origin: np.ndarray  # (3,) float, lower corner used for indexing
+
+    def __len__(self) -> int:
+        return len(self.centers)
+
+
+def _grid_from_index(idx, labels, voxel_size, origin) -> VoxelGrid:
+    """Collapse integer cell indices into a VoxelGrid (center + majority class)."""
+    keys, inverse, counts = np.unique(
+        idx, axis=0, return_inverse=True, return_counts=True
+    )
+    inverse = inverse.ravel()
+    n_vox = len(keys)
+
+    centers = (keys + 0.5) * voxel_size + origin
+
+    n_classes = MAX_CLASS_ID + 1
+    clipped = np.clip(labels, 0, MAX_CLASS_ID).astype(np.int64)
+    hist = np.zeros((n_vox, n_classes), dtype=np.int64)
+    np.add.at(hist, (inverse, clipped), 1)
+    majority = hist.argmax(axis=1).astype(np.int32)
+
+    return VoxelGrid(
+        centers=centers,
+        labels=majority,
+        counts=counts,
+        voxel_size=float(voxel_size),
+        origin=np.asarray(origin, float),
+    )
+
+
+def voxelize(
+    points: np.ndarray,
+    labels: np.ndarray,
+    voxel_size: float,
+    origin: np.ndarray | None = None,
+) -> VoxelGrid:
+    """Sample `points` into a uniform voxel grid of edge `voxel_size`.
+
+    origin defaults to points.min(axis=0) (min-corner-anchored lattice).
+    """
+    if voxel_size <= 0:
+        raise ValueError("voxel_size must be positive")
+
+    points = np.asarray(points, dtype=np.float64)
+    labels = np.asarray(labels)
+    origin = points.min(axis=0) if origin is None else np.asarray(origin, float)
+
+    idx = np.floor((points - origin) / voxel_size).astype(np.int64)
+    return _grid_from_index(idx, labels, voxel_size, origin)
+
+
+def voxelize_octree(points: np.ndarray, labels: np.ndarray, depth: int) -> VoxelGrid:
+    """Voxels of a complete octree at `depth` (centered cube lattice).
+
+    Equivalent to the occupied leaves of build_octree(points, depth): same cube
+    origin, edge root_extent/2**depth, with points on the far face folded into
+    the last cell (matching the octree's `>= center` octant test).
+    """
+    points = np.asarray(points, dtype=np.float64)
+    labels = np.asarray(labels)
+
+    origin = cube_origin(points)
+    extent = root_extent(points)
+    n = 2**depth
+    voxel_size = extent / n
+
+    idx = np.floor((points - origin) / voxel_size).astype(np.int64)
+    np.clip(idx, 0, n - 1, out=idx)  # fold the far boundary into the last cell
+    return _grid_from_index(idx, labels, voxel_size, origin)
+
+
+def verify_nonempty(grid: "VoxelGrid", n_points: int) -> tuple[bool, int, int]:
+    """Check the voxel invariant after a (re)voxelization.
+
+    Returns (ok, n_empty, n_binned):
+    - every voxel must hold at least one point (n_empty == 0), and
+    - every input point must land in exactly one voxel (n_binned == n_points).
+    Both always hold by construction; this makes that explicit so a broken
+    change (or a stray voxel) is caught the moment the voxel size changes.
+    """
+    n_empty = int((grid.counts < 1).sum())
+    n_binned = int(grid.counts.sum())
+    ok = n_empty == 0 and n_binned == n_points
+    return ok, n_empty, n_binned
+
+
+def root_extent(points: np.ndarray) -> float:
+    """Edge length of the cubic bounding box of the cloud."""
+    points = np.asarray(points, dtype=np.float64)
+    return float((points.max(axis=0) - points.min(axis=0)).max())
+
+
+def cube_origin(points: np.ndarray) -> np.ndarray:
+    """Lower corner of the centered cubic bounding box (matches the octree root)."""
+    points = np.asarray(points, dtype=np.float64)
+    lo = points.min(axis=0)
+    hi = points.max(axis=0)
+    center = (lo + hi) / 2.0
+    extent = float((hi - lo).max())
+    return center - extent / 2.0
+
+
+def voxel_size_for_depth(points: np.ndarray, depth: int) -> float:
+    """Voxel edge of a complete octree at `depth`: root_extent / 2**depth."""
+    return root_extent(points) / (2**depth)
