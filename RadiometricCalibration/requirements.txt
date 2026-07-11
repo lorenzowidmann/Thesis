@@ -1,0 +1,2 @@
+numpy
+matplotlib  # only needed for --show
