@@ -11,9 +11,11 @@ infrared radiation and converts it assuming the target is a perfect black body
 τ = 1). Both assumptions are false, so the raw "apparent temperature" is
 biased. Correcting it needs two things the thermal camera cannot supply on its
 own: the **emissivity** of the material being viewed, and the **distance** to
-each point (which sets how much radiation the atmosphere absorbs). The two
-modules below provide exactly those, and the second one combines them into the
-corrected temperature.
+each point (which sets how much radiation the atmosphere absorbs). The first
+two modules below provide exactly those, and the second combines them into the
+corrected temperature. A third module begins the **point-cloud elaboration**
+that the geometry-side corrections (co-registration, viewing angle) will build
+on.
 
 ## Modules
 
@@ -43,7 +45,22 @@ testing without hardware.
 
 Output: the corrected true-temperature map.
 
+### 3. `PointCloudElaboration/OcTree/` — voxelizing the point cloud
+
+Groundwork for the geometry side. It loads a semantically annotated point
+cloud (the TUM-FACADE benchmark, used as stand-in data) and samples it into
+**voxels** via an **octree** subdivision, with an interactive PyVista GUI: a
+metric voxel-size slider (0.05–1.0 m), a raw-points overlay, semantic-class
+coloring, and a per-change check that every voxel holds ≥1 point. Runs on
+Python 3.13 with `laspy` + `PyVista`.
+
+Output: a voxel representation of the scene — the foundation for the deferred
+LiDAR/stereo co-registration and surface-geometry work.
+
 ## How the modules connect
+
+Modules 1–2 form the temperature-correction chain; module 3 is a separate,
+foundational strand for the scene geometry (not yet wired into the chain):
 
 ```
         ZED 2i ─▶ EmissivityCalculation ─▶ emissivity ε ─┐
@@ -61,15 +78,16 @@ neither imports the other's heavy dependencies.
 
 ## Current status
 
-Both modules are **drafts** and run today on files/values instead of live
-sensors. Field integration is deliberately deferred and documented in each
-module's README:
+All three modules are **drafts** and run today on files/values (or stand-in
+datasets) instead of live sensors. Field integration is deliberately deferred
+and documented in each module's README:
 
 - **Hardware drivers** — the ZED SDK, thermal-camera SDK, LiDAR, and
-  hygrometer are stubbed until the devices are available on this PC.
+  hygrometer are stubbed until the devices are available on this PC; the
+  point-cloud module uses the TUM-FACADE benchmark as stand-in LiDAR data.
 - **Co-registration** (spatial) — the thermal, distance, and emissivity maps
   are assumed pixel-aligned; projecting the LiDAR/ZED data onto the thermal
-  image is a separate step.
+  image is a separate step that the point-cloud module lays groundwork for.
 - **Synchronization** (temporal) — matching each thermal frame to the
   LiDAR/ZED frame captured at the same instant on the moving rover (see the
   design note in `RadiometricCalibration/README.md`).
