@@ -45,17 +45,31 @@ testing without hardware.
 
 Output: the corrected true-temperature map.
 
-### 3. `PointCloudElaboration/OcTree/` — voxelizing the point cloud
+### 3. `PointCloudElaboration/OcTree/` — point cloud → planar building surfaces
 
 Groundwork for the geometry side. It loads a semantically annotated point
-cloud (the TUM-FACADE benchmark, used as stand-in data) and samples it into
-**voxels** via an **octree** subdivision, with an interactive PyVista GUI: a
-metric voxel-size slider (0.05–1.0 m), a raw-points overlay, semantic-class
-coloring, and a per-change check that every voxel holds ≥1 point. Runs on
-Python 3.13 with `laspy` + `PyVista`.
+cloud (the TUM-FACADE benchmark, used as stand-in data) and runs a small
+processing pipeline, each stage behind a toggle, in an interactive PyVista GUI:
 
-Output: a voxel representation of the scene — the foundation for the deferred
-LiDAR/stereo co-registration and surface-geometry work.
+1. **Voxelize** — sample the cloud into voxels via an **octree** subdivision;
+   a metric voxel-size slider (0.05–1.0 m), semantic-class coloring, a
+   raw-points overlay, and a per-change check that every voxel holds ≥1 point.
+2. **Filter** — a minimum-points-per-voxel threshold (1–10) that hides sparse,
+   often-disconnected scan noise.
+3. **Smooth** — flatten the stepped voxels onto a plane to get **planar,
+   well-formed surfaces for OpenStudio import**: a mode/tolerance-band fit
+   snaps recessed windows flush as co-planar fenestration and preserves
+   per-class zoning (a wall subdivided into homogeneous sub-surfaces). The
+   flattening axis auto-aligns to the building's real orientation via PCA
+   (`u` = dominant wall direction, `v` = perpendicular), since real buildings
+   are rarely aligned with world x/y. Exports OpenStudio-friendly polygon JSON
+   (with an optional `.osm` SDK adapter).
+
+Runs on Python 3.13 with `laspy` + `PyVista`.
+
+Output: a voxel/planar-surface representation of the scene — OpenStudio-ready
+building surfaces, and the foundation for the deferred LiDAR/stereo
+co-registration and surface-geometry work.
 
 ## How the modules connect
 
@@ -88,6 +102,10 @@ and documented in each module's README:
 - **Co-registration** (spatial) — the thermal, distance, and emissivity maps
   are assumed pixel-aligned; projecting the LiDAR/ZED data onto the thermal
   image is a separate step that the point-cloud module lays groundwork for.
+- **Point-cloud smoothing scope** — smoothing handles one dominant wall
+  direction pair (`u`/`v`) plus vertical; a building with more than two wall
+  orientations still needs full multi-plane segmentation (documented in the
+  module's README).
 - **Synchronization** (temporal) — matching each thermal frame to the
   LiDAR/ZED frame captured at the same instant on the moving rover (see the
   design note in `RadiometricCalibration/README.md`).
