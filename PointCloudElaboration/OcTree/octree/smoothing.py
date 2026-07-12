@@ -312,6 +312,7 @@ def _subset(grid: VoxelGrid, mask: np.ndarray) -> VoxelGrid:
     return VoxelGrid(
         centers=grid.centers[mask], labels=grid.labels[mask],
         counts=grid.counts[mask], voxel_size=grid.voxel_size, origin=grid.origin,
+        values=None if grid.values is None else grid.values[mask],
     )
 
 

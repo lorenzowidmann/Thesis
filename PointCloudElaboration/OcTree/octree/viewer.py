@@ -14,6 +14,7 @@ depth, so it can be limited to a real-world range; the octree hierarchy itself
 import numpy as np
 
 from .classes import CLASSES, class_name, colorize
+from .planes import run_dominant_plane
 from .smoothing import smooth_surface
 from .voxelizer import filter_by_count, verify_nonempty, voxelize
 
@@ -47,6 +48,26 @@ DEFAULT_SMOOTH_AXIS = "u"
 SMOOTH_AXIS_CHOICES = ("u", "v", "z")
 DEFAULT_OFFSET_METHOD = "mode"
 DEFAULT_TOLERANCE = 3
+
+# RANSAC dominant-plane -> wall raster heatmap. The "planes" checkbox runs the
+# RANSAC pipeline (planes.run_dominant_plane) on the voxel centroids and draws
+# the flattened per-cell temperature raster as a heatmap on the fitted plane,
+# with the minimum-area wall rectangle outlined. Parameters come from the CLI.
+DEFAULT_PLANES_ON = False
+DEFAULT_RANSAC_THRESHOLD = 0.10
+DEFAULT_RANSAC_ITERS = 1000
+DEFAULT_RASTER_CELL = None  # None -> use the current voxel size
+DEFAULT_GROUND_BAND = 0.5
+
+# Temperature heatmap colormap (cool blue -> pale -> hot red), interpolated in
+# numpy so no matplotlib dependency is needed (mirrors the rgb=True class path).
+_HEAT_STOPS = np.array([
+    [0.23, 0.30, 0.75],
+    [0.40, 0.65, 0.95],
+    [0.95, 0.95, 0.75],
+    [0.98, 0.65, 0.30],
+    [0.75, 0.12, 0.15],
+])
 
 # Raw points get a single high-contrast color (not class colors) so they stand
 # out against the class-colored voxels when toggled on.
@@ -97,17 +118,149 @@ def _planar_mesh(surface):
     return mesh
 
 
-def _build_voxels(points, labels, voxel_size, min_count=1):
+def _scalar_to_rgb(vals, vmin, vmax):
+    """Map scalar values to RGB via the numpy heatmap colormap (cool->hot)."""
+    span = vmax - vmin
+    t = np.clip((vals - vmin) / span, 0.0, 1.0) if span > 1e-9 else np.zeros_like(vals)
+    x = t * (len(_HEAT_STOPS) - 1)
+    i0 = np.clip(np.floor(x).astype(int), 0, len(_HEAT_STOPS) - 2)
+    f = (x - i0)[:, None]
+    return _HEAT_STOPS[i0] * (1.0 - f) + _HEAT_STOPS[i0 + 1] * f
+
+
+def _wall_heatmap_mesh(wall):
+    """Quad mesh of the wall's occupied raster cells, colored by temperature.
+
+    Each occupied cell (u, v) is placed in 3-D at origin + u*e_u + v*e_v and
+    colored by its mean temperature (heatmap). Empty cells are omitted.
+    """
+    import pyvista as pv
+
+    r = wall.raster
+    occ = np.argwhere(r.counts > 0)
+    if len(occ) == 0:
+        return None
+    iu, iv = occ[:, 0], occ[:, 1]
+    cs = r.cell_size
+    u_lo = r.u0 + iu * cs
+    v_lo = r.v0 + iv * cs
+
+    def world(u, v):
+        return (
+            wall.origin[None, :]
+            + u[:, None] * wall.e_u[None, :]
+            + v[:, None] * wall.e_v[None, :]
+        )
+
+    c00 = world(u_lo, v_lo)
+    c10 = world(u_lo + cs, v_lo)
+    c11 = world(u_lo + cs, v_lo + cs)
+    c01 = world(u_lo, v_lo + cs)
+
+    n = len(occ)
+    verts = np.empty((n * 4, 3))
+    verts[0::4], verts[1::4], verts[2::4], verts[3::4] = c00, c10, c11, c01
+    base = np.arange(n) * 4
+    faces = np.column_stack([np.full(n, 4), base, base + 1, base + 2, base + 3])
+
+    cell_vals = r.values[iu, iv]
+    finite = cell_vals[np.isfinite(cell_vals)]
+    if len(finite):
+        vmin, vmax = np.percentile(finite, [2, 98])
+    else:
+        vmin, vmax = 0.0, 1.0
+    colors = _scalar_to_rgb(np.nan_to_num(cell_vals, nan=vmin), vmin, vmax)
+
+    mesh = pv.PolyData(verts, faces.ravel())
+    mesh.cell_data["colors"] = colors
+    return mesh, (float(vmin), float(vmax))
+
+
+def _wall_outline(wall):
+    """Closed polyline (4 corners) of the wall rectangle."""
+    import pyvista as pv
+
+    pts = np.vstack([wall.rect_xyz, wall.rect_xyz[0]])
+    return pv.lines_from_points(pts)
+
+
+def _planes_info_text(wall, vrange):
+    w, h = wall.rect_dims
+    n = wall.normal
+    qc = wall.offset_stats
+    return (
+        f"RANSAC PLANE {wall.rank}/{wall.n_candidates} | "
+        f"n=({n[0]:+.2f},{n[1]:+.2f},{n[2]:+.2f})  "
+        f"{wall.n_inliers:,}/{wall.n_fitted:,} inliers "
+        f"(ground -{wall.n_ground:,})\n"
+        f"wall {w:.1f} x {h:.1f} m   raster {wall.raster.shape[0]}x"
+        f"{wall.raster.shape[1]} @ {wall.cell_size:.2f} m   "
+        f"T {vrange[0]:.1f}-{vrange[1]:.1f} C\n"
+        f"QC offset d: mean {qc['d_mean_abs_m']*100:.1f} cm, "
+        f"p95 {qc['d_p95_abs_m']*100:.1f} cm, "
+        f"protrusions {qc['n_protrusions']:,} ({qc['protrusion_frac']:.1%})"
+    )
+
+
+def _set_face_on(pl, wall):
+    """Point the camera straight at the wall plane so the raster reads as 2-D."""
+    w, h = wall.rect_dims
+    dist = 1.5 * max(w, h, 1.0)
+    pl.camera_position = [
+        tuple(wall.origin + wall.normal * dist),
+        tuple(wall.origin),
+        tuple(wall.e_v),
+    ]
+
+
+def _render_planes(pl, wall):
+    """Draw the wall heatmap + rectangle outline into plotter `pl`; return vrange."""
+    pl.remove_actor("voxels", reset_camera=False)
+    result = _wall_heatmap_mesh(wall)
+    vrange = (0.0, 1.0)
+    if result is not None:
+        mesh, vrange = result
+        pl.add_mesh(mesh, scalars="colors", rgb=True, name="voxels")
+    pl.add_mesh(_wall_outline(wall), color="black", line_width=3, name="wall_outline")
+    return vrange
+
+
+def _build_voxels(points, labels, voxel_size, min_count=1, values=None):
     """Voxelize, then optionally filter to voxels with >= min_count points.
 
     Returns (glyphs, full_grid, shown_grid): full_grid backs the non-empty
     check and the "total voxels" stat; shown_grid is what min_count kept
     (equal to full_grid when min_count <= 1) and is what gets rendered.
+    `values` is an optional per-point scalar (temperature) averaged per voxel.
     """
-    grid = voxelize(points, labels, voxel_size)
+    grid = voxelize(points, labels, voxel_size, values=values)
     shown = filter_by_count(grid, min_count)
     glyphs = _cube_glyphs(shown.centers, colorize(shown.labels), shown.voxel_size)
     return glyphs, grid, shown
+
+
+def _compute_wall(shown, threshold, iters, seed, keep_ground, ground_band, raster_cell,
+                  rank=1, target_normal=None, orientation="any"):
+    """Run the RANSAC dominant-plane pipeline on the voxel centroids of `shown`.
+
+    Uses the per-voxel mean temperature (shown.values) when available, else a
+    synthetic field on the centroids so the heatmap is populated on today's
+    (thermal-less) sample. raster_cell None -> the current voxel size. `rank`
+    (1-based, by inlier count), `target_normal` and `orientation` select which
+    detected plane to show (rank=2 -> the other facade).
+    """
+    from .planes import synthetic_temperature
+
+    if len(shown) < 3:
+        return None
+    vals = shown.values if shown.values is not None else synthetic_temperature(shown.centers)
+    cell = raster_cell if raster_cell else shown.voxel_size
+    return run_dominant_plane(
+        shown.centers, vals, threshold=threshold, iters=iters, seed=seed,
+        keep_ground=keep_ground, ground_band=ground_band, raster_cell=cell,
+        labels=shown.labels, rank=rank, target_normal=target_normal,
+        orientation=orientation,
+    )
 
 
 def _present_class_legend(labels: np.ndarray):
@@ -151,23 +304,43 @@ def render_screenshot(
     points, labels, path, voxel_size=DEFAULT_VOXEL_M, max_points=MAX_DISPLAY_POINTS,
     show_points=False, min_count=1, smooth=False, smooth_axis=DEFAULT_SMOOTH_AXIS,
     offset_method=DEFAULT_OFFSET_METHOD, tolerance=DEFAULT_TOLERANCE, rotation_deg=None,
+    planes=False, temperature=None, ransac_threshold=DEFAULT_RANSAC_THRESHOLD,
+    ransac_iters=DEFAULT_RANSAC_ITERS, raster_cell=DEFAULT_RASTER_CELL,
+    keep_ground=False, ground_band=DEFAULT_GROUND_BAND, seed=0,
+    plane_rank=1, target_normal=None, orientation="any",
 ):
-    """Headless render of voxels or a smoothed planar surface to an image file.
+    """Headless render of voxels, a smoothed planar surface, or a plane raster.
 
     min_count > 1 renders only voxels with at least that many points. smooth=True
     flattens the (filtered) grid onto a plane along smooth_axis ('x'/'y'/'z' or
-    the PCA-auto-aligned 'u'/'v') and renders the resulting planar sub-surfaces
-    instead of the voxels. rotation_deg optionally overrides the auto-detected
-    yaw (only meaningful with smooth_axis 'u'/'v').
+    the PCA-auto-aligned 'u'/'v') and renders the resulting planar sub-surfaces.
+    planes=True instead runs the RANSAC dominant-plane pipeline on the voxel
+    centroids and renders the flattened per-cell temperature raster (heatmap)
+    with the wall rectangle outlined, viewed face-on. rotation_deg optionally
+    overrides the auto-detected yaw (only meaningful with smooth_axis 'u'/'v').
     """
     import pyvista as pv
 
     pv.OFF_SCREEN = True
     pl = pv.Plotter(off_screen=True, window_size=(1400, 900))
     pl.set_background("white")
-    if show_points:
+    if show_points and not planes:
         _add_points(pl, points, max_points)
-    glyphs, grid, shown = _build_voxels(points, labels, voxel_size, min_count)
+    glyphs, grid, shown = _build_voxels(points, labels, voxel_size, min_count, values=temperature)
+
+    if planes:
+        wall = _compute_wall(shown, ransac_threshold, ransac_iters, seed,
+                             keep_ground, ground_band, raster_cell,
+                             rank=plane_rank, target_normal=target_normal,
+                             orientation=orientation)
+        if wall is None:
+            raise RuntimeError("not enough voxels for RANSAC plane detection")
+        vrange = _render_planes(pl, wall)
+        pl.add_text(_planes_info_text(wall, vrange), font_size=10, name="info")
+        _set_face_on(pl, wall)
+        pl.screenshot(path)
+        pl.close()
+        return wall
 
     if smooth:
         surface = smooth_surface(shown, smooth_axis, offset_method, tolerance, rotation_deg=rotation_deg)
@@ -194,16 +367,43 @@ def render_screenshot(
     return result
 
 
+def render_wall_screenshot(wall, path, window_size=(1400, 900)):
+    """Headless render of an already-computed WallPlane (heatmap + rectangle).
+
+    Used by the --export-wall path so the PNG matches the exported wall exactly
+    (no recomputation, so raw-points vs. centroids stays consistent). The camera
+    looks along the plane normal, so the raster reads as a flat 2-D heatmap.
+    """
+    import pyvista as pv
+
+    pv.OFF_SCREEN = True
+    pl = pv.Plotter(off_screen=True, window_size=window_size)
+    pl.set_background("white")
+    vrange = _render_planes(pl, wall)
+    pl.add_text(_planes_info_text(wall, vrange), font_size=10, name="info")
+    _set_face_on(pl, wall)
+    pl.screenshot(path)
+    pl.close()
+    return path
+
+
 def launch(
     points, labels, voxel_size=DEFAULT_VOXEL_M, max_points=MAX_DISPLAY_POINTS,
     min_count=DEFAULT_MIN_COUNT, filter_on=DEFAULT_FILTER_ON,
     smooth_on=DEFAULT_SMOOTH_ON, smooth_axis=DEFAULT_SMOOTH_AXIS,
     offset_method=DEFAULT_OFFSET_METHOD, tolerance=DEFAULT_TOLERANCE, rotation_deg=None,
+    planes_on=DEFAULT_PLANES_ON, temperature=None,
+    ransac_threshold=DEFAULT_RANSAC_THRESHOLD, ransac_iters=DEFAULT_RANSAC_ITERS,
+    raster_cell=DEFAULT_RASTER_CELL, keep_ground=False,
+    ground_band=DEFAULT_GROUND_BAND, seed=0,
+    plane_rank=1, target_normal=None, orientation="any",
 ):
-    """Open the interactive viewer: voxel-size slider, min-points filter, points/filter/smooth toggles.
+    """Open the interactive viewer: voxel-size slider, min-points filter, points/filter/smooth/planes toggles.
 
     The smooth axis (u/v/z) has its own live radio-style selector so the other
-    wall direction can be inspected without relaunching.
+    wall direction can be inspected without relaunching. The "planes" toggle
+    runs the RANSAC dominant-plane pipeline and shows the flattened per-cell
+    temperature raster (heatmap) with the wall rectangle outlined.
     """
     import pyvista as pv
 
@@ -223,12 +423,42 @@ def launch(
         # away from it, but a startup choice of x/y isn't silently discarded.
         "smooth_axis": smooth_axis,
         "rotation_deg": rotation_deg,
+        "planes_on": bool(planes_on),
+        "plane_rank": int(plane_rank),
+        # Cycle through the detected planes (facades) live; None until the first
+        # plane render tells us how many candidates there are.
+        "n_candidates": None,
+        # Recenter the camera face-on when the plane identity changes (toggle on
+        # or rank change), but not on every voxel-size tweak, so orbiting sticks.
+        "planes_recenter": True,
     }
     axis_widgets = {}  # filled after creation, used to keep the radio selection in sync
 
     def show_voxels():
         effective_min = state["min_count"] if state["filter_on"] else 1
-        glyphs, grid, shown = _build_voxels(points, labels, state["voxel"], effective_min)
+        glyphs, grid, shown = _build_voxels(
+            points, labels, state["voxel"], effective_min, values=temperature
+        )
+
+        # RANSAC dominant-plane raster takes priority over the other views.
+        if state["planes_on"]:
+            wall = _compute_wall(shown, ransac_threshold, ransac_iters, seed,
+                                 keep_ground, ground_band, raster_cell,
+                                 rank=state["plane_rank"], target_normal=target_normal,
+                                 orientation=orientation)
+            if wall is None:
+                print("[planes] not enough voxels for RANSAC plane detection")
+                return
+            state["n_candidates"] = wall.n_candidates
+            vrange = _render_planes(pl, wall)
+            if state["planes_recenter"]:
+                _set_face_on(pl, wall)
+                state["planes_recenter"] = False
+            print(f"[planes] {_planes_info_text(wall, vrange)}")
+            pl.add_text(_planes_info_text(wall, vrange), font_size=10,
+                        position="upper_left", name="info")
+            return
+        pl.remove_actor("wall_outline", reset_camera=False)
 
         if state["smooth_on"]:
             # Pipeline: voxelize -> (filter) -> smooth. Render planar surface.
@@ -291,6 +521,22 @@ def launch(
         state["smooth_on"] = bool(flag)
         show_voxels()
 
+    def on_toggle_planes(flag):
+        state["planes_on"] = bool(flag)
+        state["planes_recenter"] = True  # face the wall when planes turns on
+        show_voxels()
+
+    def on_next_plane(flag):
+        # Cycle to the next detected plane (facade) and recenter on it. This is
+        # a momentary button: it re-renders, then unchecks itself.
+        if not state["planes_on"] or not state.get("n_candidates"):
+            next_plane_widget.GetRepresentation().SetState(0)
+            return
+        state["plane_rank"] = state["plane_rank"] % state["n_candidates"] + 1
+        state["planes_recenter"] = True
+        show_voxels()
+        next_plane_widget.GetRepresentation().SetState(0)
+
     def on_pick_axis(axis):
         def handler(flag):
             if not flag:
@@ -328,15 +574,23 @@ def launch(
     pl.add_text("filter on/off", font_size=9, position=(44, 48), name="filter_toggle_label")
     pl.add_checkbox_button_widget(on_toggle_smooth, value=state["smooth_on"], size=26, position=(10, 82))
     pl.add_text("smooth on/off", font_size=9, position=(44, 84), name="smooth_toggle_label")
+    # RANSAC dominant-plane -> wall temperature raster (heatmap).
+    pl.add_checkbox_button_widget(on_toggle_planes, value=state["planes_on"], size=26, position=(10, 118))
+    pl.add_text("planes on/off", font_size=9, position=(44, 120), name="planes_toggle_label")
+    # Momentary "next plane" button: cycle through the detected facades.
+    next_plane_widget = pl.add_checkbox_button_widget(
+        on_next_plane, value=False, size=20, position=(150, 118), color_on="tan"
+    )
+    pl.add_text("next plane", font_size=9, position=(174, 120), name="next_plane_label")
     # Live radio-style axis selector (u / v / z) for smoothing — lets the
     # other wall direction be inspected without relaunching the script.
-    pl.add_text("axis:", font_size=9, position=(10, 119), name="axis_row_label")
+    pl.add_text("axis:", font_size=9, position=(10, 155), name="axis_row_label")
     axis_x = {"u": 60, "v": 100, "z": 140}
     for a in SMOOTH_AXIS_CHOICES:
         axis_widgets[a] = pl.add_checkbox_button_widget(
-            on_pick_axis(a), value=(a == state["smooth_axis"]), size=20, position=(axis_x[a], 118)
+            on_pick_axis(a), value=(a == state["smooth_axis"]), size=20, position=(axis_x[a], 154)
         )
-        pl.add_text(a, font_size=9, position=(axis_x[a] + 24, 119), name=f"axis_label_{a}")
+        pl.add_text(a, font_size=9, position=(axis_x[a] + 24, 155), name=f"axis_label_{a}")
     # Compact class legend pinned to the lower-right corner (small font: the
     # row height drives the text size, so keep it tight).
     legend = _present_class_legend(labels)

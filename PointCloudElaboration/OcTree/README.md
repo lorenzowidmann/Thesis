@@ -73,8 +73,71 @@ i.e. rotation about the vertical axis, is corrected, not pitch/roll).
 
 **Limitation.** This only handles a single wall direction pair (u/v) plus
 vertical (z) — a building with more than two wall directions, or a genuinely
-pitched/rolled scan, needs full multi-plane segmentation (RANSAC/region-growing),
-which is not built yet (see "Next steps").
+pitched/rolled scan, needs full multi-plane segmentation (RANSAC/region-growing).
+The dominant-plane raster below is the first step of that (see "Next steps").
+
+## Dominant-plane wall raster (RANSAC → 2-D raster) (`octree/planes.py`)
+
+An alternative to the yaw-only smoothing above: detect a wall as an **arbitrary
+plane** (any orientation, not just a yaw-corrected vertical), flatten it to a
+continuous **2-D temperature raster**, and fit the wall polygon. Pure numpy —
+RANSAC, the convex hull and the rotating-calipers rectangle are all implemented
+in-module, so no sklearn/open3d/scipy. The pipeline (`run_dominant_plane`):
+
+1. **Ground removal** — the *known-vertical-normal* trick (same idea as the
+   calibration board): the ground is horizontal, so fix the normal to `+z` and
+   take the densest low-z layer as its offset (`detect_ground`); those points
+   are dropped first. When labels exist, ground/terrain classes are dropped too.
+   `--keep-ground` skips this.
+2. **Dominant plane** — RANSAC/MSAC on the voxel **centroids** (fast proxy,
+   default) or the **raw points** (`--ransac-on points`): sample 3 points, score
+   inliers (MSAC = truncated-L2, rewards tight fits), keep the best, then refit
+   the normal to all inliers via SVD (`fit_plane_ransac`). `extract_planes`
+   repeats this (fit → strip inliers → refit) to list the top candidate walls,
+   so you can **choose which one** (see "Choosing which wall" below) rather than
+   being stuck with only the single most-populated plane.
+3. **Local 2-D basis** — PCA on the inliers gives two orthonormal in-plane axes
+   `(u, v)` aligned with the wall (`plane_basis`, the 3-D generalization of
+   `principal_yaw`).
+4. **Projection** — every voxel gets an in-plane `(u, v)` and a signed
+   perpendicular offset `d` (`project_to_plane`). `d` is **QC only** — it flags
+   protrusions / recesses / mis-detections and is *not* folded back into the
+   geometry.
+5. **Raster** — bin `(u, v)` into a regular grid and **average the temperature**
+   of the voxels in each cell (`rasterize`). This is the "smoothing" result: a
+   flat, continuous 2-D grid computed *in-plane*, replacing the stepped voxel
+   shell. Empty cells stay NaN.
+6. **Wall polygon** — the **minimum-area rotated rectangle** of the `(u, v)`
+   footprint (`min_area_rect`), mapped back to 3-D and emitted as a single
+   envelope `Surface` via the existing `wall_to_surface` → `to_openstudio_json`
+   → `to_osm` path.
+
+**Choosing which wall.** A building has several large planes — typically two
+perpendicular **facade families** (e.g. this sample: normal `(0.37, 0.93)` with
+~5,100 inliers, and the perpendicular `(-0.93, 0.37)` with ~3,900). By default
+you get the plane with the most inliers (`--plane-rank 1`); the *other* facade is
+usually `--plane-rank 2`. You can instead point at a direction with
+`--target-normal X,Y,Z` (picks the **biggest** wall within ~37° of it, so an
+approximate direction is fine despite the building's yaw), and/or restrict with
+`--orientation vertical` (facades only) / `horizontal` (floors/roofs). In the
+interactive viewer, the **"next plane"** button cycles through the detected walls
+live, and the view snaps **face-on** to each so the raster reads as a flat 2-D
+heatmap (the info line shows `PLANE R/N`). *If a wall looks like a thin, sparse,
+tilted band, you are almost certainly seeing a real facade at a grazing camera
+angle — orbit to face it, or use "next plane" / a screenshot, which auto-faces.*
+
+**Temperature.** The cloud has no per-point temperature yet (LiDAR↔thermal
+co-registration is future work in `../RadiometricCalibration`), so the raster
+averages a **generic per-point scalar**: it is auto-loaded from a `.las`
+extra-dim (`temperature`/`scalar_Temperature`/… or `--temperature-dim NAME`) when
+present, and otherwise falls back to a **deterministic synthetic field**
+(`synthetic_temperature`, seeded by `--seed`) so the pipeline runs on today's
+sample. `--synthetic-temp` forces the synthetic field even if the file has one.
+
+**QC (offset `d`).** `--export-wall` writes a `*_qc.json` with the plane
+parameters and the distribution of `d` over the voxels **inside this wall's
+footprint** (within a shallow depth window, so other facades/roof are not
+miscounted): mean/p95/max `|d|` and the count/fraction beyond a protrusion band.
 
 ## Data
 
@@ -132,8 +195,26 @@ python main.py --smooth --smooth-axis u --rotation-deg 66.2
 # Export planar sub-surfaces as OpenStudio-friendly JSON, then exit
 python main.py --export-openstudio surfaces.json --smooth-axis u --voxel-size 0.20
 
+# RANSAC dominant-plane -> per-wall 2D temperature raster (heatmap).
+python main.py --planes                                       # interactive heatmap
+python main.py --planes --screenshot plane_raster.png        # headless heatmap
+python main.py --planes --ransac-on points --ransac-threshold 0.08   # fit on raw points
+
+# Choose which wall: rank 2 = the other (perpendicular) facade; or aim a normal.
+python main.py --planes --plane-rank 2                        # the other facade
+python main.py --planes --target-normal 1,0,0                 # wall facing ~+x
+python main.py --planes --orientation vertical               # facades only (no roofs)
+#   (interactive: the "next plane" button cycles through the detected walls)
+
+# Export the wall: OpenStudio JSON + raster .npy/.png + QC json, then exit.
+python main.py --export-wall wall.json --raster-cell 0.20
+#   -> wall.json, wall_raster.npy, wall_raster.png, wall_qc.json
+
 # Consistency checks (octree leaves == voxelizer voxels, monotonicity)
 python main.py --selftest
+
+# RANSAC/basis/raster/rectangle checks on a synthetic wall (no .las needed)
+python main.py --plane-selftest
 ```
 
 **Viewer controls.** The lower slider sets the voxel edge in metres (0.05 m
@@ -190,20 +271,21 @@ OcTree/
 │   ├── voxelizer.py          # voxelize(), voxelize_octree(), filter_by_count() (numpy)
 │   ├── octree.py             # OctreeNode, build_octree(), level_counts(), leaf_voxels()
 │   ├── smoothing.py          # smooth_surface() -> PlanarSurface, to_openstudio_json()
+│   ├── planes.py             # RANSAC dominant-plane -> basis -> 2D raster -> wall rect (numpy)
 │   ├── openstudio_adapter.py # PlanarSurface/JSON -> .osm via the OpenStudio SDK (optional)
 │   ├── classes.py            # TUM-FACADE class id -> name / RGB, colorize()
-│   └── viewer.py             # PyVista GUI: sliders + points/filter/smooth toggles, legend
+│   └── viewer.py             # PyVista GUI: sliders + points/filter/smooth/planes toggles, legend
 ├── data/                     # extracted .las + preview PNGs (git-ignored)
 └── requirements.txt
 ```
 
 ## Next steps (not in this draft)
 
-- Multi-plane segmentation: PCA (`principal_yaw`/axes `u`/`v`) now handles a
-  single dominant wall direction and its perpendicular, but a building with
-  more than two wall directions still needs per-wall segmentation
-  (RANSAC/region-growing) instead of one global yaw (see smoothing's
-  "Limitation" above).
+- Multi-plane segmentation: `planes.py` now detects the **single dominant**
+  plane by RANSAC/MSAC (any orientation) and rasterizes it. The next step is to
+  **iterate** it — fit a plane, strip its inliers, repeat — to segment *all*
+  major walls at once (and to attach each fenestration sub-surface to its wall),
+  rather than the single wall or the yaw-only `u`/`v` pair from smoothing.
 - Connected-components filtering: keep only voxels belonging to a large
   cluster of adjacent occupied voxels, to remove isolated survivors of the
   minimum-points filter (see "On filtering vs. connectivity" above).
