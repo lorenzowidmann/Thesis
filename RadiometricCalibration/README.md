@@ -36,7 +36,11 @@ is fixed.
 (same H×W, pixel-aligned). Projecting the LiDAR point cloud / ZED
 classification onto the thermal image (extrinsic calibration between the
 sensors) is handled separately, like the viewing-angle correction was
-deferred in EmissivityCalculation.
+deferred in EmissivityCalculation. Once that projection exists, the corrected
+per-pixel true temperature can be attached to the LiDAR points and averaged
+into the per-wall 2-D raster produced by `../PointCloudElaboration/OcTree`
+(its `planes.py` already consumes a per-point temperature scalar, and falls
+back to a synthetic field until then).
 
 ## Synchronization (design note — not yet implemented)
 

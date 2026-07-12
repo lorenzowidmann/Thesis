@@ -64,12 +64,23 @@ processing pipeline, each stage behind a toggle, in an interactive PyVista GUI:
    (`u` = dominant wall direction, `v` = perpendicular), since real buildings
    are rarely aligned with world x/y. Exports OpenStudio-friendly polygon JSON
    (with an optional `.osm` SDK adapter).
+4. **Planes** — an alternative flatten via **RANSAC/MSAC dominant-plane
+   detection**. After removing the ground (known-vertical-normal trick), it fits
+   the wall plane at *any* orientation, builds a local 2-D basis by PCA, and
+   rasterizes the voxels into a continuous **per-wall 2-D temperature raster**
+   (per-cell mean) — the smoothing goal computed in-plane rather than as a 3-D
+   mesh. The wall's **minimum-area rotated rectangle** is exported as an
+   OpenStudio `Surface`, and the per-voxel perpendicular offset flags
+   protrusions for QC. Buildings have several facades, so the plane is
+   selectable (`--plane-rank` / `--target-normal`, or a live "next plane"
+   button). Temperature is read from the cloud when present, else a synthetic
+   field stands in until LiDAR↔thermal co-registration exists.
 
-Runs on Python 3.13 with `laspy` + `PyVista`.
+Runs on Python 3.13 with `laspy` + `PyVista` (pure numpy for the RANSAC path).
 
 Output: a voxel/planar-surface representation of the scene — OpenStudio-ready
-building surfaces, and the foundation for the deferred LiDAR/stereo
-co-registration and surface-geometry work.
+building surfaces, per-wall 2-D temperature rasters, and the foundation for the
+deferred LiDAR/stereo co-registration and surface-geometry work.
 
 ## How the modules connect
 
@@ -102,10 +113,11 @@ and documented in each module's README:
 - **Co-registration** (spatial) — the thermal, distance, and emissivity maps
   are assumed pixel-aligned; projecting the LiDAR/ZED data onto the thermal
   image is a separate step that the point-cloud module lays groundwork for.
-- **Point-cloud smoothing scope** — smoothing handles one dominant wall
-  direction pair (`u`/`v`) plus vertical; a building with more than two wall
-  orientations still needs full multi-plane segmentation (documented in the
-  module's README).
+- **Point-cloud plane scope** — the yaw-based smoothing handles one dominant
+  wall direction pair (`u`/`v`) plus vertical, and the RANSAC path now detects
+  the single **dominant** plane at any orientation and rasterizes it; iterating
+  it to segment *all* walls at once (full multi-plane segmentation) is still
+  future work (documented in the module's README).
 - **Synchronization** (temporal) — matching each thermal frame to the
   LiDAR/ZED frame captured at the same instant on the moving rover (see the
   design note in `RadiometricCalibration/README.md`).
