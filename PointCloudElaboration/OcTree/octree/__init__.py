@@ -10,6 +10,7 @@ from .smoothing import (
     fit_plane_ransac,
     plane_basis,
     principal_yaw,
+    project_axis_aligned,
     smooth_surface,
     to_openstudio_json,
 )
@@ -39,6 +40,7 @@ __all__ = [
     "level_counts",
     "leaf_voxels",
     "smooth_surface",
+    "project_axis_aligned",
     "principal_yaw",
     "fit_plane_ransac",
     "extract_planes",

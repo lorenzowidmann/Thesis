@@ -82,6 +82,18 @@ def parse_args():
         help="Half-width in voxels of the band snapped onto the plane (default 3)",
     )
     p.add_argument(
+        "--project-to-axis-aligned", action="store_true",
+        help="After the RANSAC smooth, derive a second surface on a world-axis-"
+        "aligned grid (vertical columns on a facade, X/Y on a roof) instead of "
+        "the diagonal PCA basis; sparse colour blobs are dropped (see --min-side). "
+        "RANSAC offset-method only",
+    )
+    p.add_argument(
+        "--min-side", type=float, default=1.0, metavar="M",
+        help="Axis-aligned projection: keep a colour blob only if its bounding "
+        "box reaches this many metres on at least one side (default 1.0)",
+    )
+    p.add_argument(
         "--export-openstudio", default=None, metavar="PATH.json",
         help="Smooth and write OpenStudio-friendly polygon JSON, then exit",
     )
@@ -159,6 +171,16 @@ def main():
             rotation_deg=args.rotation_deg, ransac_threshold=args.ransac_threshold,
             ransac_iters=args.ransac_iters, seed=args.seed,
         )
+        if args.project_to_axis_aligned:
+            from octree import project_axis_aligned
+
+            if surface.normal is None:
+                print("--project-to-axis-aligned needs --offset-method ransac", file=sys.stderr)
+                return 2
+            surface = project_axis_aligned(
+                grid, surface, min_side_m=args.min_side, tolerance_voxels=args.tolerance,
+            )
+            print(f"Re-projected onto world-axis-aligned grid (min-side {args.min_side:.2f} m).")
         path = to_openstudio_json(surface, args.export_openstudio)
         if surface.normal is not None:
             n = surface.normal
@@ -183,6 +205,7 @@ def main():
             offset_method=args.offset_method, tolerance=args.tolerance,
             rotation_deg=args.rotation_deg, ransac_threshold=args.ransac_threshold,
             ransac_iters=args.ransac_iters, seed=args.seed,
+            axis_aligned=args.project_to_axis_aligned, min_side=args.min_side,
         )
         print(f"Wrote {args.screenshot}  (voxel {args.voxel_size:.2f} m)")
         return 0
@@ -198,6 +221,7 @@ def main():
         offset_method=args.offset_method, tolerance=args.tolerance,
         rotation_deg=args.rotation_deg, ransac_threshold=args.ransac_threshold,
         ransac_iters=args.ransac_iters, seed=args.seed,
+        axis_aligned_on=args.project_to_axis_aligned, min_side=args.min_side,
     )
     return 0
 

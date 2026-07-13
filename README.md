@@ -65,8 +65,12 @@ processing pipeline, each stage behind a toggle, in an interactive PyVista GUI:
    sub-surfaces). The `u`/`v`/`z` selector picks *which* detected plane to
    flatten — `u` the dominant facade, `v` the perpendicular facade, `z` the
    roof/floor — with the legacy PCA-yaw voxel-layer method still available via
-   `--offset-method`. Exports OpenStudio-friendly polygon JSON (with an optional
-   `.osm` SDK adapter).
+   `--offset-method`. An opt-in `--project-to-axis-aligned` step then derives a
+   **second** surface from the fitted plane on a **world-axis-aligned** grid
+   (gravity-vertical columns on a facade, X/Y on a roof) instead of the diagonal
+   PCA basis, dropping colour patches smaller than `--min-side` metres as noise.
+   Exports OpenStudio-friendly polygon JSON (with an optional `.osm` SDK
+   adapter).
 
 Runs on Python 3.13 with `laspy` + `PyVista` (pure numpy for the RANSAC path).
 

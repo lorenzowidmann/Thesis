@@ -14,7 +14,7 @@ depth, so it can be limited to a real-world range; the octree hierarchy itself
 import numpy as np
 
 from .classes import CLASSES, class_name, colorize
-from .smoothing import PlaneAnchor, smooth_surface
+from .smoothing import PlaneAnchor, project_axis_aligned, smooth_surface
 from .voxelizer import filter_by_count, verify_nonempty, voxelize
 
 # Metric limits of the voxel-size slider.
@@ -56,6 +56,15 @@ DEFAULT_TOLERANCE = 3
 # and reused on every later voxel-size/filter change, so only the raster's
 # resolution changes, not which plane or where on it the surface sits.
 DEFAULT_ANCHOR_ON = False
+
+# Axis-aligned re-projection toggle (RANSAC path only). When on, the smoothed
+# surface is re-rastered on a world-axis-aligned grid (vertical columns on a
+# facade, X/Y on a roof) instead of the diagonal PCA basis, and colour blobs
+# smaller than DEFAULT_MIN_SIDE metres on both sides are dropped as noise
+# (see smoothing.project_axis_aligned). Off by default — the diagonal PCA
+# surface stays the default behaviour.
+DEFAULT_AXIS_ALIGNED_ON = False
+DEFAULT_MIN_SIDE = 1.0
 
 # Raw points get a single high-contrast color (not class colors) so they stand
 # out against the class-colored voxels when toggled on.
@@ -177,6 +186,7 @@ def render_screenshot(
     show_points=False, min_count=1, smooth=False, smooth_axis=DEFAULT_SMOOTH_AXIS,
     offset_method=DEFAULT_OFFSET_METHOD, tolerance=DEFAULT_TOLERANCE, rotation_deg=None,
     ransac_threshold=None, ransac_iters=500, seed=0,
+    axis_aligned=DEFAULT_AXIS_ALIGNED_ON, min_side=DEFAULT_MIN_SIDE,
 ):
     """Headless render of voxels or a smoothed planar surface to an image file.
 
@@ -202,6 +212,10 @@ def render_screenshot(
             shown, smooth_axis, offset_method, tolerance, rotation_deg=rotation_deg,
             ransac_threshold=ransac_threshold, ransac_iters=ransac_iters, seed=seed,
         )
+        if axis_aligned and surface.normal is not None:
+            surface = project_axis_aligned(
+                shown, surface, min_side_m=min_side, tolerance_voxels=tolerance,
+            )
         mesh = _planar_mesh(surface)
         if mesh is not None:
             pl.add_mesh(mesh, scalars="colors", rgb=True, name="voxels", show_edges=True)
@@ -231,6 +245,7 @@ def launch(
     smooth_on=DEFAULT_SMOOTH_ON, smooth_axis=DEFAULT_SMOOTH_AXIS,
     offset_method=DEFAULT_OFFSET_METHOD, tolerance=DEFAULT_TOLERANCE, rotation_deg=None,
     ransac_threshold=None, ransac_iters=500, seed=0, anchor_on=DEFAULT_ANCHOR_ON,
+    axis_aligned_on=DEFAULT_AXIS_ALIGNED_ON, min_side=DEFAULT_MIN_SIDE,
 ):
     """Open the interactive viewer: voxel-size slider, min-points filter, points/filter/smooth toggles.
 
@@ -262,6 +277,8 @@ def launch(
         "rotation_deg": rotation_deg,
         "anchor_on": bool(anchor_on) and offset_method == "ransac",
         "anchor_plane": None,  # captured (or reused) the first time anchor_on is True
+        "axis_aligned_on": bool(axis_aligned_on) and offset_method == "ransac",
+        "min_side": float(min_side),
     }
     axis_widgets = {}  # filled after creation, used to keep the radio selection in sync
 
@@ -279,8 +296,15 @@ def launch(
             )
             if state["anchor_on"]:
                 # Latch the plane just used (fresh fit the first time, or the
-                # same anchor reused) so it carries forward unchanged.
+                # same anchor reused) so it carries forward unchanged. Capture it
+                # from the RANSAC surface, before any axis-aligned re-projection.
                 state["anchor_plane"] = PlaneAnchor.from_surface(surface) or state["anchor_plane"]
+            if state["axis_aligned_on"] and surface.normal is not None:
+                # Second, world-axis-aligned surface derived from the RANSAC one
+                # (reuses its plane; drops sub-min_side colour blobs).
+                surface = project_axis_aligned(
+                    shown, surface, min_side_m=state["min_side"], tolerance_voxels=tolerance,
+                )
             mesh = _planar_mesh(surface)
             pl.remove_actor("voxels", reset_camera=False)
             if mesh is not None:
@@ -345,6 +369,11 @@ def launch(
         if state["smooth_on"]:
             show_voxels()
 
+    def on_toggle_axis_aligned(flag):
+        state["axis_aligned_on"] = bool(flag) and offset_method == "ransac"
+        if state["smooth_on"]:
+            show_voxels()
+
     def on_pick_axis(axis):
         def handler(flag):
             if not flag:
@@ -387,15 +416,17 @@ def launch(
     pl.add_text("smooth on/off", font_size=9, position=(44, 84), name="smooth_toggle_label")
     pl.add_checkbox_button_widget(on_toggle_anchor, value=state["anchor_on"], size=26, position=(10, 118))
     pl.add_text("anchor plane on/off", font_size=9, position=(44, 120), name="anchor_toggle_label")
+    pl.add_checkbox_button_widget(on_toggle_axis_aligned, value=state["axis_aligned_on"], size=26, position=(10, 154))
+    pl.add_text("axis-aligned on/off", font_size=9, position=(44, 156), name="axis_aligned_toggle_label")
     # Live radio-style axis selector (u / v / z) for smoothing — lets the
     # other wall direction be inspected without relaunching the script.
-    pl.add_text("axis:", font_size=9, position=(10, 155), name="axis_row_label")
+    pl.add_text("axis:", font_size=9, position=(10, 191), name="axis_row_label")
     axis_x = {"u": 60, "v": 100, "z": 140}
     for a in SMOOTH_AXIS_CHOICES:
         axis_widgets[a] = pl.add_checkbox_button_widget(
-            on_pick_axis(a), value=(a == state["smooth_axis"]), size=20, position=(axis_x[a], 154)
+            on_pick_axis(a), value=(a == state["smooth_axis"]), size=20, position=(axis_x[a], 190)
         )
-        pl.add_text(a, font_size=9, position=(axis_x[a] + 24, 155), name=f"axis_label_{a}")
+        pl.add_text(a, font_size=9, position=(axis_x[a] + 24, 191), name=f"axis_label_{a}")
     # Compact class legend pinned to the lower-right corner (small font: the
     # row height drives the text size, so keep it tight).
     legend = _present_class_legend(labels)

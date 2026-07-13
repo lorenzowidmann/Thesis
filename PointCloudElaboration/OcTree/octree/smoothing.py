@@ -750,6 +750,133 @@ def _smooth_surface_ransac(
     return surface
 
 
+# --------------------------------------------------------------------------- #
+# Axis-aligned re-projection (opt-in): reuse a RANSAC plane but swap the PCA    #
+# basis for one aligned to the world axes, and drop sparse colour blobs.        #
+# --------------------------------------------------------------------------- #
+def _axis_aligned_basis(normal: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """World-aligned in-plane axes (e_h, e_w) for a plane of the given normal.
+
+    e_h is the horizontal in-plane direction (world +Z x normal): for a vertical
+    facade that is the along-wall horizontal axis, so grid columns come out
+    vertical (gravity-aligned). e_w = normal x e_h completes a right-handed frame
+    (e_h x e_w = normal), so a CCW winding in (h, w) is CCW about +normal — the
+    same convention as `plane_basis`/`_quad_uv`. When the plane is ~horizontal
+    (a roof/floor, normal ~ +/-Z) e_h degenerates, so it falls back to
+    world +X x normal, giving an X/Y grid.
+    """
+    n = np.asarray(normal, dtype=np.float64)
+    n = n / np.linalg.norm(n)
+    e_h = np.cross(np.array([0.0, 0.0, 1.0]), n)
+    if np.linalg.norm(e_h) < 1e-6:  # normal ~ +/-Z (roof/floor): use world X instead
+        e_h = np.cross(np.array([1.0, 0.0, 0.0]), n)
+    e_h = e_h / np.linalg.norm(e_h)
+    e_w = np.cross(n, e_h)
+    e_w = e_w / np.linalg.norm(e_w)
+    return e_h, e_w
+
+
+def _drop_small_components(
+    raster: np.ndarray, cell_size: float, min_side_m: float
+) -> np.ndarray:
+    """Blank same-class cell blobs whose bounding box is smaller than min_side_m.
+
+    For each class, its cells are grouped into 4-connected components
+    (`_label_components`); a component is kept only if the longer side of its
+    bounding box (max of width, height) reaches `min_side_m` metres — i.e. a
+    single side passing the threshold is enough (logical OR, matching the spec:
+    a long thin thermal stripe survives). Components under the threshold (noise,
+    isolated specks) are set to -1 (empty). Returns a new raster.
+    """
+    out = np.asarray(raster).copy()
+    if out.size == 0 or min_side_m <= 0:
+        return out
+    for cid in np.unique(out[out >= 0]):
+        labels, n_components = _label_components(out == cid)
+        for comp in range(n_components):
+            cells = np.argwhere(labels == comp)
+            rows, cols = cells[:, 0], cells[:, 1]
+            height = (rows.max() - rows.min() + 1) * cell_size
+            width = (cols.max() - cols.min() + 1) * cell_size
+            if max(height, width) < min_side_m:
+                out[rows, cols] = -1
+    return out
+
+
+def project_axis_aligned(
+    grid: VoxelGrid,
+    surface: PlanarSurface,
+    min_side_m: float = 1.0,
+    tolerance_voxels: int = 3,
+    select: np.ndarray | None = None,
+    cell_size: float | None = None,
+) -> PlanarSurface:
+    """Re-raster a RANSAC surface on a world-axis-aligned grid, with a size gate.
+
+    `surface` must come from the RANSAC path (its `normal`/`origin` are set). The
+    fitted plane is reused as-is (no re-fit): the same voxels are re-projected
+    onto it, but the in-plane grid is built on the world-aligned basis
+    (`_axis_aligned_basis`) instead of the PCA basis, so it follows the world
+    axes (vertical columns on a facade, X/Y on a roof) rather than a diagonal.
+    Each class is then zoned as usual, but same-class cell blobs whose bounding
+    box is under `min_side_m` on *both* sides are dropped as noise
+    (`_drop_small_components`) — so only colours that are "sufficiently present"
+    (>= min_side_m along at least one side) are carried onto this second plane.
+
+    `cell_size` defaults to the surface's voxel size. The tolerance band reuses
+    the surface's voxel size (as the first pass did). Returns a new
+    `PlanarSurface`; the input is left untouched.
+    """
+    if surface.normal is None or surface.origin is None:
+        raise ValueError(
+            "project_axis_aligned needs a RANSAC-fitted surface "
+            "(normal/origin set) — run smooth_surface with offset_method='ransac'"
+        )
+    n = np.asarray(surface.normal, dtype=np.float64)
+    origin = np.asarray(surface.origin, dtype=np.float64)
+    cell = float(cell_size) if cell_size else surface.voxel_size
+    e_h, e_w = _axis_aligned_basis(n)
+
+    mask = np.ones(len(grid), bool) if select is None else np.asarray(select, bool)
+    centers = grid.centers[mask]
+    labels = grid.labels[mask]
+
+    out = PlanarSurface(
+        axis=surface.axis, plane_coord=float(origin @ n), voxel_size=cell,
+        rotation_deg=surface.rotation_deg,
+        normal=n.copy(), origin=origin.copy(), e_u=e_h.copy(), e_v=e_w.copy(),
+    )
+    if len(centers) < 1:
+        return out
+
+    u, v, d = project_to_plane(centers, origin, e_h, e_w, n)
+    band = tolerance_voxels * surface.voxel_size
+    inlier = np.abs(d) <= band
+    out.n_inliers = int(inlier.sum())
+    out.n_deviations = int((~inlier).sum())
+    if not inlier.any():
+        return out
+
+    u0, v0 = float(u[inlier].min()), float(v[inlier].min())
+    iu = np.floor((u[inlier] - u0) / cell).astype(np.int64)
+    iv = np.floor((v[inlier] - v0) / cell).astype(np.int64)
+    raster, i0, j0 = _zone_by_class(np.column_stack([iu, iv]), labels[inlier])
+    raster = _drop_small_components(raster, cell, min_side_m)
+
+    for cid in np.unique(raster[raster >= 0]):
+        polys = []
+        for r0, c0, r1, c1 in _greedy_rectangles(raster == cid):
+            uu0 = u0 + (i0 + r0) * cell
+            uu1 = u0 + (i0 + r1 + 1) * cell
+            vv0 = v0 + (j0 + c0) * cell
+            vv1 = v0 + (j0 + c1 + 1) * cell
+            polys.append(_quad_uv(uu0, uu1, vv0, vv1, origin, e_h, e_w))
+        out.subsurfaces.append(
+            SubSurface(int(cid), class_name(int(cid)), _role(int(cid)), polys)
+        )
+    return out
+
+
 def _smooth_surface_core(
     grid: VoxelGrid,
     axis: str,

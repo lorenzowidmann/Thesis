@@ -59,6 +59,24 @@ voxels onto it, and keeps each voxel's class:
   automatically. Output is a planar wall subdivided into homogeneous
   sub-surfaces by class, not one uniform plane.
 
+**Axis-aligned re-projection (opt-in, `--project-to-axis-aligned`).** By default
+the in-plane grid follows the PCA basis (`e_u`, `e_v`), which is generally
+*diagonal* with respect to the world axes. With this flag a **second** surface is
+derived from the first: it **reuses the same RANSAC plane** (same normal, no
+re-fit) but rebuilds the grid on a **world-axis-aligned basis**
+(`project_axis_aligned` / `_axis_aligned_basis`): `e_h = worldZ × n` (horizontal,
+along the facade) and `e_w = n × e_h`, so on a vertical wall the grid columns are
+gravity-vertical, and on a roof/floor (`n ∥ Z`, where `e_h` would degenerate) it
+falls back to `worldX × n`, giving an X/Y grid. The colours (classes) already
+computed on the diagonal plane are re-rastered onto this aligned grid.
+A **size gate** (`--min-side`, default 1.0 m) then keeps a colour only if it is
+"sufficiently present": same-class cells are grouped into 4-connected components
+(`_drop_small_components` / `_label_components`) and a component survives only if
+the **longer side** of its bounding box reaches `min_side` metres — one side is
+enough (logical OR), so a long thin thermal stripe is kept while an isolated
+speck (noise) is dropped and left empty. Off by default; the diagonal PCA
+surface stays the default behaviour.
+
 `to_openstudio_json` writes the surfaces as JSON (planar 3-D vertex loops +
 class + envelope/fenestration `role`); `octree/openstudio_adapter.py` maps that
 to an `.osm` via the OpenStudio SDK (envelope → `Surface`, fenestration →
@@ -143,6 +161,13 @@ python main.py --smooth --ransac-threshold 0.10 --ransac-iters 800 --seed 1
 # Legacy voxel-layer method (PCA-yaw u/v), with a manual yaw override
 python main.py --smooth --offset-method mode --smooth-axis u --rotation-deg 66.2
 
+# Axis-aligned re-projection: derive a second surface on a world-aligned grid
+# (vertical columns on a facade, X/Y on a roof); drop colour blobs under 1 m.
+# Works in the GUI (live "axis-aligned on/off" toggle), --screenshot, and export.
+python main.py --smooth --project-to-axis-aligned --min-side 1.0
+python main.py --screenshot flat_axis.png --smooth --project-to-axis-aligned
+python main.py --export-openstudio surfaces.json --smooth-axis u --project-to-axis-aligned
+
 # Export planar sub-surfaces as OpenStudio-friendly JSON, then exit
 python main.py --export-openstudio surfaces.json --smooth-axis u --voxel-size 0.20
 
@@ -162,11 +187,15 @@ stay visible; when off, the voxels are solid and colored by semantic class
 (matching the legend). The "smooth on/off" checkbox (top-left, third row)
 flattens the (filtered) voxels into planar, class-colored sub-surfaces (the
 pipeline is voxelize → filter → smooth); the plane is RANSAC-fitted, and the
-method (default `ransac`) and tolerance come from the CLI. The **axis row**
-below it (u / v / z checkboxes) switches which detected plane is flattened onto
-live, without relaunching — u = the dominant facade, v = the perpendicular
-facade, z = roof/floor (a startup `--smooth-axis x`/`y`, picking the plane
-nearest that world axis, is respected but isn't on this row).
+method (default `ransac`) and tolerance come from the CLI. The **"axis-aligned
+on/off"** checkbox (fourth row) toggles the world-axis-aligned re-projection
+live (`--project-to-axis-aligned`, RANSAC only): when on, the smoothed surface is
+re-rastered on a world-aligned grid and colour blobs under `--min-side` metres
+are dropped. The **axis row** below it (u / v / z checkboxes) switches which
+detected plane is flattened onto live, without relaunching — u = the dominant
+facade, v = the perpendicular facade, z = roof/floor (a startup `--smooth-axis
+x`/`y`, picking the plane nearest that world axis, is respected but isn't on this
+row).
 
 **On filtering vs. connectivity.** The minimum-points filter is a per-voxel
 density threshold — it removes sparse voxels but does not check whether the
@@ -204,7 +233,7 @@ OcTree/
 │   ├── las_loader.py         # read .las -> points + semantic labels (robust to label field)
 │   ├── voxelizer.py          # voxelize(), voxelize_octree(), filter_by_count() (numpy)
 │   ├── octree.py             # OctreeNode, build_octree(), level_counts(), leaf_voxels()
-│   ├── smoothing.py          # RANSAC plane fit + smooth_surface() -> PlanarSurface, to_openstudio_json()
+│   ├── smoothing.py          # RANSAC plane fit + smooth_surface() -> PlanarSurface, project_axis_aligned(), to_openstudio_json()
 │   ├── openstudio_adapter.py # PlanarSurface/JSON -> .osm via the OpenStudio SDK (optional)
 │   ├── classes.py            # TUM-FACADE class id -> name / RGB, colorize()
 │   └── viewer.py             # PyVista GUI: sliders + points/filter/smooth toggles, legend
