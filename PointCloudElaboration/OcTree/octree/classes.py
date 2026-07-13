@@ -27,9 +27,17 @@ CLASSES: dict[int, tuple[str, tuple[float, float, float]]] = {
     15: ("outer ceiling surface", (0.65, 0.65, 0.75)),
     16: ("interior", (0.90, 0.85, 0.55)),
     17: ("other", (0.25, 0.25, 0.25)),
+    # 18 is NOT a TUM-FACADE class: it is a synthetic marker for enclosed voids
+    # in a smoothed surface that could not be resolved to a single neighbouring
+    # class (see smoothing.fill_enclosed_cells). Vivid magenta so it stands out.
+    18: ("unknown", (0.95, 0.10, 0.90)),
 }
 
 MAX_CLASS_ID = max(CLASSES)
+
+# Class id assigned to a filled void whose bordering cells disagree (mixed
+# classes). Single source of truth, reused by smoothing.fill_enclosed_cells.
+UNKNOWN_CLASS_ID = 18
 
 
 def class_name(class_id: int) -> str:

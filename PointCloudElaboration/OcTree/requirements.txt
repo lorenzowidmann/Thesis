@@ -1,6 +1,3 @@
 numpy
 laspy[lazrs]   # .las / .laz reading (lazrs backend for compressed files)
 pyvista        # 3D visualization (pulls in VTK)
-# No sklearn / open3d / scipy: RANSAC/MSAC plane fitting, the convex hull and
-# the rotating-calipers min-area rectangle (octree/planes.py) are implemented
-# in numpy, and the wall heatmap uses a numpy colormap (no matplotlib needed).

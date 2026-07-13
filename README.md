@@ -57,30 +57,22 @@ processing pipeline, each stage behind a toggle, in an interactive PyVista GUI:
 2. **Filter** — a minimum-points-per-voxel threshold (1–10) that hides sparse,
    often-disconnected scan noise.
 3. **Smooth** — flatten the stepped voxels onto a plane to get **planar,
-   well-formed surfaces for OpenStudio import**: a mode/tolerance-band fit
-   snaps recessed windows flush as co-planar fenestration and preserves
-   per-class zoning (a wall subdivided into homogeneous sub-surfaces). The
-   flattening axis auto-aligns to the building's real orientation via PCA
-   (`u` = dominant wall direction, `v` = perpendicular), since real buildings
-   are rarely aligned with world x/y. Exports OpenStudio-friendly polygon JSON
-   (with an optional `.osm` SDK adapter).
-4. **Planes** — an alternative flatten via **RANSAC/MSAC dominant-plane
-   detection**. After removing the ground (known-vertical-normal trick), it fits
-   the wall plane at *any* orientation, builds a local 2-D basis by PCA, and
-   rasterizes the voxels into a continuous **per-wall 2-D temperature raster**
-   (per-cell mean) — the smoothing goal computed in-plane rather than as a 3-D
-   mesh. The wall's **minimum-area rotated rectangle** is exported as an
-   OpenStudio `Surface`, and the per-voxel perpendicular offset flags
-   protrusions for QC. Buildings have several facades, so the plane is
-   selectable (`--plane-rank` / `--target-normal`, or a live "next plane"
-   button). Temperature is read from the cloud when present, else a synthetic
-   field stands in until LiDAR↔thermal co-registration exists.
+   well-formed surfaces for OpenStudio import**. The plane is found by a
+   **RANSAC/MSAC dominant-plane fit** (pure numpy) that locks onto the actual
+   wall at *any* orientation — tilt included — not just world x/y. A
+   tolerance-band snap pulls recessed windows flush as co-planar fenestration,
+   and per-class zoning is preserved (a wall subdivided into homogeneous
+   sub-surfaces). The `u`/`v`/`z` selector picks *which* detected plane to
+   flatten — `u` the dominant facade, `v` the perpendicular facade, `z` the
+   roof/floor — with the legacy PCA-yaw voxel-layer method still available via
+   `--offset-method`. Exports OpenStudio-friendly polygon JSON (with an optional
+   `.osm` SDK adapter).
 
 Runs on Python 3.13 with `laspy` + `PyVista` (pure numpy for the RANSAC path).
 
 Output: a voxel/planar-surface representation of the scene — OpenStudio-ready
-building surfaces, per-wall 2-D temperature rasters, and the foundation for the
-deferred LiDAR/stereo co-registration and surface-geometry work.
+building surfaces, and the foundation for the deferred LiDAR/stereo
+co-registration and surface-geometry work.
 
 ## How the modules connect
 
@@ -113,11 +105,11 @@ and documented in each module's README:
 - **Co-registration** (spatial) — the thermal, distance, and emissivity maps
   are assumed pixel-aligned; projecting the LiDAR/ZED data onto the thermal
   image is a separate step that the point-cloud module lays groundwork for.
-- **Point-cloud plane scope** — the yaw-based smoothing handles one dominant
-  wall direction pair (`u`/`v`) plus vertical, and the RANSAC path now detects
-  the single **dominant** plane at any orientation and rasterizes it; iterating
-  it to segment *all* walls at once (full multi-plane segmentation) is still
-  future work (documented in the module's README).
+- **Point-cloud plane scope** — the RANSAC smoothing fits the single
+  **dominant** plane at any orientation (the `u`/`v`/`z` selector picks the
+  dominant facade, its perpendicular, or the roof/floor); iterating the fit to
+  segment *all* walls at once (full multi-plane segmentation) is still future
+  work (documented in the module's README).
 - **Synchronization** (temporal) — matching each thermal frame to the
   LiDAR/ZED frame captured at the same instant on the moving rover (see the
   design note in `RadiometricCalibration/README.md`).

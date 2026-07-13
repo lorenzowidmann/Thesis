@@ -29,20 +29,13 @@ class VoxelGrid:
     counts: np.ndarray  # (M,) int, points per voxel
     voxel_size: float
     origin: np.ndarray  # (3,) float, lower corner used for indexing
-    values: np.ndarray | None = None  # (M,) float, mean per-point scalar
-    #   (e.g. temperature) of the points in each voxel; None when no scalar
-    #   was supplied at voxelization time.
 
     def __len__(self) -> int:
         return len(self.centers)
 
 
-def _grid_from_index(idx, labels, voxel_size, origin, values=None) -> VoxelGrid:
-    """Collapse integer cell indices into a VoxelGrid (center + majority class).
-
-    If `values` (a per-point scalar such as temperature) is given, each voxel
-    also carries the *mean* of that scalar over the points it absorbed.
-    """
+def _grid_from_index(idx, labels, voxel_size, origin) -> VoxelGrid:
+    """Collapse integer cell indices into a VoxelGrid (center + majority class)."""
     keys, inverse, counts = np.unique(
         idx, axis=0, return_inverse=True, return_counts=True
     )
@@ -57,20 +50,12 @@ def _grid_from_index(idx, labels, voxel_size, origin, values=None) -> VoxelGrid:
     np.add.at(hist, (inverse, clipped), 1)
     majority = hist.argmax(axis=1).astype(np.int32)
 
-    voxel_values = None
-    if values is not None:
-        values = np.asarray(values, dtype=np.float64)
-        sums = np.zeros(n_vox, dtype=np.float64)
-        np.add.at(sums, inverse, values)
-        voxel_values = sums / counts
-
     return VoxelGrid(
         centers=centers,
         labels=majority,
         counts=counts,
         voxel_size=float(voxel_size),
         origin=np.asarray(origin, float),
-        values=voxel_values,
     )
 
 
@@ -79,13 +64,10 @@ def voxelize(
     labels: np.ndarray,
     voxel_size: float,
     origin: np.ndarray | None = None,
-    values: np.ndarray | None = None,
 ) -> VoxelGrid:
     """Sample `points` into a uniform voxel grid of edge `voxel_size`.
 
     origin defaults to points.min(axis=0) (min-corner-anchored lattice).
-    `values` is an optional per-point scalar (e.g. temperature) averaged per
-    voxel into VoxelGrid.values.
     """
     if voxel_size <= 0:
         raise ValueError("voxel_size must be positive")
@@ -95,7 +77,7 @@ def voxelize(
     origin = points.min(axis=0) if origin is None else np.asarray(origin, float)
 
     idx = np.floor((points - origin) / voxel_size).astype(np.int64)
-    return _grid_from_index(idx, labels, voxel_size, origin, values)
+    return _grid_from_index(idx, labels, voxel_size, origin)
 
 
 def voxelize_octree(points: np.ndarray, labels: np.ndarray, depth: int) -> VoxelGrid:
@@ -135,7 +117,6 @@ def filter_by_count(grid: VoxelGrid, min_count: int) -> VoxelGrid:
         counts=grid.counts[mask],
         voxel_size=grid.voxel_size,
         origin=grid.origin,
-        values=None if grid.values is None else grid.values[mask],
     )
 
 
