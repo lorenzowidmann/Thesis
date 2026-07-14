@@ -77,6 +77,42 @@ enough (logical OR), so a long thin thermal stripe is kept while an isolated
 speck (noise) is dropped and left empty. Off by default; the diagonal PCA
 surface stays the default behaviour.
 
+**Adjacent-rectangle merging (opt-in, `--merge-adjacent`).** `_greedy_rectangles`
+covers each class with *many* small rectangles (e.g. one physical window can be
+a dozen tiled fragments). `merge_planar_surface` (`smoothing.py`) is a
+post-process that fuses same-class rectangles that touch — a shared edge with
+overlapping extent on the perpendicular axis; corner-only contact never
+counts — into single unified ones, run after `_greedy_rectangles`/
+`project_axis_aligned` and before `to_openstudio_json`. A group whose union is
+already a perfect rectangle is replaced exactly; otherwise it's reshaped per
+`--merge-fit-strategy`: `max_inscribed` (default) shrinks to the largest
+rectangle within the true footprint (never overclaims area), `bounding_box`
+grows to contain the whole group (never loses area, but is guarded against
+absorbing another class's rectangles — falls back to `max_inscribed` if it
+would). `--merge-gap-tolerance M` (metres, rounded up to whole raster cells)
+extends merging to rectangles separated by a small real gap, not just exact
+zero-gap contact; it only has an effect together with `--merge-adjacent`.
+
+"Touching" is transitive, so on a real facade the dominant/background class
+(wall) typically forms *one* sprawling component spanning the whole surface,
+not many small local clusters — collapsing that to a single rectangle would
+discard or overclaim most of it. `--merge-min-coverage` (default 0.8) guards
+against this: a reshaped rectangle is accepted only if it retains at least
+that fraction of the group's true area in both directions; a component that
+fails is left as its original, unmerged rectangles instead — nothing is ever
+silently discarded or overclaimed past the threshold. In practice this means
+wall/roof/terrain rarely merge (correctly — they're one sprawling shape) while
+locally-scoped clusters like windows often do; lower `--merge-min-coverage`
+(e.g. `0.5`) for more aggressive merging at the cost of fidelity. Each output
+rectangle keeps provenance — which original rectangles it replaced, whether
+the merge was exact, whether gap tolerance was needed, which fit strategy was
+actually used (`RectMergeInfo`) — which survives into the `to_openstudio_json`
+export as `merge_info`, and a per-class before/after diagnostic prints via
+`MergeSummary.print_report()`. Requires a RANSAC-fitted surface (or a literal
+`x`/`y`/`z` legacy axis) — legacy PCA-yaw `u`/`v` (`--offset-method` !=
+`ransac`) can't be reversed to its local raster grid from a `PlanarSurface`
+alone and is rejected with a clear error rather than silently mis-merged.
+
 `to_openstudio_json` writes the surfaces as JSON (planar 3-D vertex loops +
 class + envelope/fenestration `role`); `octree/openstudio_adapter.py` maps that
 to an `.osm` via the OpenStudio SDK (envelope → `Surface`, fenestration →
@@ -167,6 +203,17 @@ python main.py --smooth --offset-method mode --smooth-axis u --rotation-deg 66.2
 python main.py --smooth --project-to-axis-aligned --min-side 1.0
 python main.py --screenshot flat_axis.png --smooth --project-to-axis-aligned
 python main.py --export-openstudio surfaces.json --smooth-axis u --project-to-axis-aligned
+
+# Merge touching same-class rectangles (e.g. a tiled window -> one rectangle).
+# Base merging: exact zero-gap edge contact only. Works in the GUI (launch-time
+# only, no live toggle), --screenshot, and export.
+python main.py --smooth --merge-adjacent
+python main.py --screenshot merged.png --smooth --merge-adjacent
+# Extended merging: also bridge small real gaps (rounded up to whole cells),
+# and tune how aggressively irregular groups are allowed to merge.
+python main.py --export-openstudio surfaces.json --smooth-axis u \
+    --merge-adjacent --merge-gap-tolerance 0.1 --merge-fit-strategy bounding_box \
+    --merge-min-coverage 0.5
 
 # Export planar sub-surfaces as OpenStudio-friendly JSON, then exit
 python main.py --export-openstudio surfaces.json --smooth-axis u --voxel-size 0.20

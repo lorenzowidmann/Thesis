@@ -14,7 +14,7 @@ depth, so it can be limited to a real-world range; the octree hierarchy itself
 import numpy as np
 
 from .classes import CLASSES, class_name, colorize
-from .smoothing import PlaneAnchor, project_axis_aligned, smooth_surface
+from .smoothing import PlaneAnchor, merge_planar_surface, project_axis_aligned, smooth_surface
 from .voxelizer import filter_by_count, verify_nonempty, voxelize
 
 # Metric limits of the voxel-size slider.
@@ -65,6 +65,15 @@ DEFAULT_ANCHOR_ON = False
 # surface stays the default behaviour.
 DEFAULT_AXIS_ALIGNED_ON = False
 DEFAULT_MIN_SIDE = 1.0
+
+# Adjacent-rectangle merging (opt-in, post-smoothing). Launch-time only (no
+# live toggle, matching --tolerance/--offset-method/--ransac-iters, which
+# also aren't exposed as GUI widgets) — see main.py's --merge-adjacent /
+# --merge-gap-tolerance / --merge-fit-strategy and smoothing.merge_planar_surface.
+DEFAULT_MERGE_ADJACENT_ON = False
+DEFAULT_MERGE_GAP_TOLERANCE = 0.0
+DEFAULT_MERGE_FIT_STRATEGY = "max_inscribed"
+DEFAULT_MERGE_MIN_COVERAGE = 0.8
 
 # Raw points get a single high-contrast color (not class colors) so they stand
 # out against the class-colored voxels when toggled on.
@@ -187,6 +196,8 @@ def render_screenshot(
     offset_method=DEFAULT_OFFSET_METHOD, tolerance=DEFAULT_TOLERANCE, rotation_deg=None,
     ransac_threshold=None, ransac_iters=500, seed=0,
     axis_aligned=DEFAULT_AXIS_ALIGNED_ON, min_side=DEFAULT_MIN_SIDE,
+    merge_adjacent=DEFAULT_MERGE_ADJACENT_ON, merge_gap_tolerance=DEFAULT_MERGE_GAP_TOLERANCE,
+    merge_fit_strategy=DEFAULT_MERGE_FIT_STRATEGY, merge_min_coverage=DEFAULT_MERGE_MIN_COVERAGE,
 ):
     """Headless render of voxels or a smoothed planar surface to an image file.
 
@@ -196,7 +207,9 @@ def render_screenshot(
     smooth_axis selects which RANSAC-fitted plane to use ('u' dominant facade,
     'v' perpendicular facade, 'z' roof/floor); ransac_threshold/iters/seed tune
     the fit. rotation_deg only applies to the legacy 'mode'/'median'/'outer'
-    methods on axis 'u'/'v'.
+    methods on axis 'u'/'v'. merge_adjacent=True runs merge_planar_surface after
+    smoothing (and after axis_aligned, if both are on) and prints its diagnostic
+    report to the console.
     """
     import pyvista as pv
 
@@ -216,6 +229,17 @@ def render_screenshot(
             surface = project_axis_aligned(
                 shown, surface, min_side_m=min_side, tolerance_voxels=tolerance,
             )
+        if merge_adjacent and surface.normal is None and smooth_axis in ("u", "v"):
+            print(
+                "[merge] skipped: needs offset_method='ransac' when smooth_axis is "
+                "'u'/'v' (legacy PCA-yaw u/v can't be reversed to its raster grid)"
+            )
+        elif merge_adjacent:
+            surface, merge_summary = merge_planar_surface(
+                surface, gap_tolerance=merge_gap_tolerance, fit_strategy=merge_fit_strategy,
+                min_coverage=merge_min_coverage,
+            )
+            merge_summary.print_report()
         mesh = _planar_mesh(surface)
         if mesh is not None:
             pl.add_mesh(mesh, scalars="colors", rgb=True, name="voxels", show_edges=True)
@@ -246,6 +270,8 @@ def launch(
     offset_method=DEFAULT_OFFSET_METHOD, tolerance=DEFAULT_TOLERANCE, rotation_deg=None,
     ransac_threshold=None, ransac_iters=500, seed=0, anchor_on=DEFAULT_ANCHOR_ON,
     axis_aligned_on=DEFAULT_AXIS_ALIGNED_ON, min_side=DEFAULT_MIN_SIDE,
+    merge_adjacent_on=DEFAULT_MERGE_ADJACENT_ON, merge_gap_tolerance=DEFAULT_MERGE_GAP_TOLERANCE,
+    merge_fit_strategy=DEFAULT_MERGE_FIT_STRATEGY, merge_min_coverage=DEFAULT_MERGE_MIN_COVERAGE,
 ):
     """Open the interactive viewer: voxel-size slider, min-points filter, points/filter/smooth toggles.
 
@@ -255,7 +281,9 @@ def launch(
     roof-floor), so the other wall can be inspected without relaunching. The
     "anchor plane" toggle (RANSAC only) freezes the currently fitted plane so
     later voxel-size/filter changes reproject onto it instead of re-fitting —
-    see DEFAULT_ANCHOR_ON.
+    see DEFAULT_ANCHOR_ON. merge_adjacent_on runs merge_planar_surface on every
+    re-render (launch-time only, no live toggle — see DEFAULT_MERGE_ADJACENT_ON)
+    and prints its diagnostic report to the console each time.
     """
     import pyvista as pv
 
@@ -279,6 +307,10 @@ def launch(
         "anchor_plane": None,  # captured (or reused) the first time anchor_on is True
         "axis_aligned_on": bool(axis_aligned_on) and offset_method == "ransac",
         "min_side": float(min_side),
+        "merge_adjacent_on": bool(merge_adjacent_on),
+        "merge_gap_tolerance": float(merge_gap_tolerance),
+        "merge_fit_strategy": merge_fit_strategy,
+        "merge_min_coverage": float(merge_min_coverage),
     }
     axis_widgets = {}  # filled after creation, used to keep the radio selection in sync
 
@@ -305,6 +337,18 @@ def launch(
                 surface = project_axis_aligned(
                     shown, surface, min_side_m=state["min_side"], tolerance_voxels=tolerance,
                 )
+            if state["merge_adjacent_on"] and surface.normal is None and state["smooth_axis"] in ("u", "v"):
+                print(
+                    "[merge] skipped: needs offset_method='ransac' when smooth_axis is "
+                    "'u'/'v' (legacy PCA-yaw u/v can't be reversed to its raster grid)"
+                )
+            elif state["merge_adjacent_on"]:
+                surface, merge_summary = merge_planar_surface(
+                    surface, gap_tolerance=state["merge_gap_tolerance"],
+                    fit_strategy=state["merge_fit_strategy"],
+                    min_coverage=state["merge_min_coverage"],
+                )
+                merge_summary.print_report()
             mesh = _planar_mesh(surface)
             pl.remove_actor("voxels", reset_camera=False)
             if mesh is not None:

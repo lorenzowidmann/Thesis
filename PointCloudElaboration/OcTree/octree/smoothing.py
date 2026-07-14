@@ -36,7 +36,7 @@ refit and the PCA basis are all implemented here so smoothing runs headless.
 """
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import numpy as np
@@ -70,6 +70,8 @@ class SubSurface:
     class_name: str
     role: str  # "envelope" | "fenestration"
     polygons: list[np.ndarray]  # each (4, 3) planar quad, world coords, CCW about +normal
+    merge_info: "list[RectMergeInfo] | None" = None  # parallel to polygons; set by
+    #             merge_planar_surface, None if that pass hasn't run on this surface
 
 
 @dataclass
@@ -442,6 +444,73 @@ def _zone_by_class(cell_ij: np.ndarray, labels: np.ndarray):
     return raster, int(i0), int(j0)
 
 
+# All 8 corner sign combinations of a cube, computed once.
+_CUBE_CORNER_SIGNS = np.array(
+    [[sx, sy, sz] for sx in (-1.0, 1.0) for sy in (-1.0, 1.0) for sz in (-1.0, 1.0)]
+)  # (8, 3)
+
+
+def _footprint_cells(
+    centers: np.ndarray,
+    voxel_size: float,
+    origin: np.ndarray,
+    e_u: np.ndarray,
+    e_v: np.ndarray,
+    normal: np.ndarray,
+    u0: float,
+    v0: float,
+    pitch: float | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Conservative (u, v) raster-cell footprint of each voxel's cube.
+
+    Binning a voxel by its *center point* alone can miss raster cells when the
+    world lattice is rotated relative to the plane's (e_u, e_v) basis: a
+    rotated square lattice rebinned at the same pitch is provably
+    non-bijective, so some target cells get 0 points (a hole) while a
+    fully-surrounded neighbour gets 2+, even though the wall has full
+    physical voxel coverage (this is what smooth_surface's RANSAC 'u'/'v'
+    axes hit whenever the building isn't grid-aligned, which is the common
+    case). This instead projects all 8 corners of each voxel's `voxel_size`
+    cube onto (e_u, e_v), takes the per-voxel in-plane bounding box, and
+    returns every raster bin of width `pitch` that box overlaps.
+
+    Face-adjacent voxels are `voxel_size` apart along one world axis; each
+    footprint's half-width along u is
+    `voxel_size/2 * (|e_u . x| + |e_u . y| + |e_u . z|)`, which is always >=
+    half the center-to-center gap along that axis — so adjacent voxels'
+    footprints always touch or overlap, and a solid, gap-free voxel block
+    rasterizes to a gap-free cell set.
+
+    Returns (iu, iv, src): int64 arrays of equal, expanded length (each voxel
+    contributes 1 or more entries). `src[k]` indexes back into `centers`, so
+    callers build `_zone_by_class`'s label array as `labels[src]`.
+    """
+    pitch = voxel_size if pitch is None else pitch
+    n = len(centers)
+    if n == 0:
+        empty = np.empty(0, np.int64)
+        return empty, empty, empty
+
+    corners = centers[:, None, :] + _CUBE_CORNER_SIGNS[None, :, :] * (voxel_size / 2.0)
+    cu, cv, _ = project_to_plane(corners.reshape(-1, 3), origin, e_u, e_v, normal)
+    cu, cv = cu.reshape(n, 8), cv.reshape(n, 8)
+
+    iu_min = np.floor((cu.min(axis=1) - u0) / pitch).astype(np.int64)
+    iu_max = np.floor((cu.max(axis=1) - u0) / pitch).astype(np.int64)
+    iv_min = np.floor((cv.min(axis=1) - v0) / pitch).astype(np.int64)
+    iv_max = np.floor((cv.max(axis=1) - v0) / pitch).astype(np.int64)
+    n_u, n_v = iu_max - iu_min + 1, iv_max - iv_min + 1
+
+    du, dv = np.arange(int(n_u.max())), np.arange(int(n_v.max()))
+    iu_grid, iv_grid = np.broadcast_arrays(
+        iu_min[:, None, None] + du[None, :, None], iv_min[:, None, None] + dv[None, None, :]
+    )
+    valid = (du[None, :, None] < n_u[:, None, None]) & (dv[None, None, :] < n_v[:, None, None])
+    valid = np.broadcast_to(valid, iu_grid.shape)
+    src_grid = np.broadcast_to(np.arange(n)[:, None, None], iu_grid.shape)
+    return iu_grid[valid], iv_grid[valid], src_grid[valid]
+
+
 def _label_components(mask: np.ndarray) -> tuple[np.ndarray, int]:
     """4-connected component labels of a 2-D boolean mask (plain BFS flood fill).
 
@@ -550,6 +619,432 @@ def _quad_uv(u0, u1, v0, v1, origin, e_u, e_v):
     return np.array(
         [origin + uu * e_u + vv * e_v for uu, vv in corners_uv], dtype=float
     )
+
+
+# --------------------------------------------------------------------------- #
+# Adjacent-rectangle merging (opt-in post-process). Runs after _greedy_        #
+# rectangles has already produced a surface's polygons and before export      #
+# (to_openstudio_json / openstudio_adapter.py): fuses same-class rectangles   #
+# that touch (or nearly touch, within a tolerance) into single unified ones.  #
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class _Rect:
+    """One rectangle in the merge pass: integer raster-cell bounds, inclusive."""
+    id: int
+    class_id: int
+    r0: int
+    c0: int
+    r1: int
+    c1: int
+
+    @property
+    def area(self) -> int:
+        return (self.r1 - self.r0 + 1) * (self.c1 - self.c0 + 1)
+
+
+@dataclass
+class RectMergeInfo:
+    """Provenance for one output rectangle, parallel to a SubSurface's `polygons`."""
+    merged_from: list[int]     # pre-merge polygon indices (within that class) it replaces
+    exact: bool                # True: the (merged) rectangle loses/gains no real area
+    used_gap_tolerance: bool   # True: at least one connecting edge needed gap_tolerance > 0
+    fit_strategy_used: str     # "none" (untouched) | "exact" | "max_inscribed" | "bounding_box"
+
+
+def _rects_touch(a: "_Rect", b: "_Rect", gap_tolerance: float) -> tuple[bool, bool]:
+    """Whether `a`/`b` share a full or partial edge, within `gap_tolerance` cells.
+
+    Requires overlap along exactly one axis (the "perpendicular" extent) and a
+    gap of at most `gap_tolerance` cells along the other (the shared-edge axis)
+    between them. Corner-only contact has zero overlap on *both* axes and is
+    therefore never "touching", regardless of gap_tolerance. Returns
+    (touching, needed_gap): `needed_gap` is True iff the actual gap was > 0,
+    i.e. the tolerance was genuinely required to bridge it (vs. exact
+    zero-gap contact) — used to report which merges relied on the extended
+    near-touching mode.
+    """
+    row_overlap = max(a.r0, b.r0) <= min(a.r1, b.r1)
+    col_overlap = max(a.c0, b.c0) <= min(a.c1, b.c1)
+
+    if row_overlap and not col_overlap:
+        gap = (b.c0 - a.c1 - 1) if b.c0 > a.c1 else (a.c0 - b.c1 - 1)
+        if 0 <= gap <= gap_tolerance:
+            return True, gap > 0
+    elif col_overlap and not row_overlap:
+        gap = (b.r0 - a.r1 - 1) if b.r0 > a.r1 else (a.r0 - b.r1 - 1)
+        if 0 <= gap <= gap_tolerance:
+            return True, gap > 0
+    return False, False
+
+
+class _UnionFind:
+    def __init__(self, n: int):
+        self.parent = list(range(n))
+
+    def find(self, x: int) -> int:
+        while self.parent[x] != x:
+            self.parent[x] = self.parent[self.parent[x]]
+            x = self.parent[x]
+        return x
+
+    def union(self, a: int, b: int) -> None:
+        ra, rb = self.find(a), self.find(b)
+        if ra != rb:
+            self.parent[rb] = ra
+
+
+def _max_inscribed_rect(mask: np.ndarray) -> tuple[int, int, int, int]:
+    """Largest axis-aligned all-True rectangle in a 2-D boolean array.
+
+    Classic "maximal rectangle in a binary matrix" algorithm: a per-row
+    histogram of consecutive True cells stacked above each column, solved with
+    the "largest rectangle in a histogram" stack method, O(rows*cols). Returns
+    local (r0, c0, r1, c1) inclusive bounds within `mask` (mask is assumed
+    non-empty — callers only invoke this on a non-trivial component).
+    """
+    n_rows, n_cols = mask.shape
+    height = np.zeros(n_cols, dtype=np.int64)
+    best_area = 0
+    best = (0, 0, 0, 0)
+    for r in range(n_rows):
+        height = np.where(mask[r], height + 1, 0)
+        stack: list[tuple[int, int]] = []  # (start_col, h), increasing h
+        for c in range(n_cols + 1):
+            h = int(height[c]) if c < n_cols else 0
+            start = c
+            while stack and stack[-1][1] >= h:
+                s, sh = stack.pop()
+                area = sh * (c - s)
+                if area > best_area:
+                    best_area = area
+                    best = (r - sh + 1, s, r, c - 1)
+                start = s
+            stack.append((start, h))
+    return best
+
+
+def _merge_adjacent_rectangles(
+    rectangles: "list[_Rect]",
+    gap_tolerance: float = 0.0,
+    fit_strategy: str = "max_inscribed",
+    min_coverage: float = 0.8,
+    allow_overlap_check=None,
+) -> "list[tuple[_Rect, RectMergeInfo]]":
+    """Merge touching (or near-touching) same-class rectangles into unified ones.
+
+    a. Groups `rectangles` by `class_id`.
+    b. Within each group, two rectangles are "touching" per `_rects_touch`:
+       shared-edge overlap with a gap <= `gap_tolerance` cells; corner-only
+       contact never counts, regardless of `gap_tolerance`.
+    c. Connected components of touching rectangles (union-find). On a real
+       surface "touching" is transitive across the whole footprint, so the
+       dominant/background class (e.g. wall) typically forms *one* sprawling
+       component spanning the surface, not many small local clusters.
+    d. A component whose union is already a perfect rectangle (its total area
+       equals its bounding box's area — only possible when every connecting
+       gap was 0, i.e. base merging) is replaced by that exact rectangle
+       (always accepted: a perfect tiling loses/gains nothing).
+    e. Otherwise it's reshaped per `fit_strategy`:
+       'max_inscribed' -- the largest all-covered rectangle within the
+           group's true footprint (never claims undetected area; can drop
+           real cells of the original shape).
+       'bounding_box' -- the smallest rectangle containing the whole group
+           (never loses detected area; can absorb empty/gap cells). If
+           `allow_overlap_check(class_id, r0, c0, r1, c1) -> bool` is given
+           and returns True for the candidate bbox (meaning it would overlap
+           another class's rectangles), falls back to 'max_inscribed' for
+           that one component instead of silently encroaching.
+       The reshaped rectangle is accepted only if it retains a large enough
+       share of the group's true union area: `min(final_area, union_area) /
+       max(final_area, union_area) >= min_coverage` (checked in whichever
+       direction the strategy can lose fidelity -- shrink for
+       'max_inscribed', overclaim for 'bounding_box'). A component that fails
+       this gate (e.g. the whole wall reshaped to one small rectangle) is
+       instead passed through as its **original, unmerged rectangles**,
+       tagged `fit_strategy_used="rejected_low_coverage"` -- no data is ever
+       silently discarded or overclaimed past `min_coverage`.
+    f. Every output rectangle is paired with a `RectMergeInfo` recording which
+       input ids it replaced and how (exact vs. reshaped, whether gap
+       tolerance was needed, which fit strategy was actually applied).
+
+    A singleton "component" (a rectangle with no touching neighbour) is
+    passed through unchanged, tagged `RectMergeInfo([id], True, False, "none")`.
+
+    Returns a list of (merged_rect, info) pairs, order not significant.
+    """
+    if fit_strategy not in ("max_inscribed", "bounding_box"):
+        raise ValueError(f"fit_strategy must be 'max_inscribed' or 'bounding_box' (got {fit_strategy!r})")
+    if gap_tolerance < 0:
+        raise ValueError("gap_tolerance must be >= 0")
+    if not (0.0 < min_coverage <= 1.0):
+        raise ValueError("min_coverage must be in (0.0, 1.0]")
+
+    by_class: dict[int, list[_Rect]] = {}
+    for rect in rectangles:
+        by_class.setdefault(rect.class_id, []).append(rect)
+
+    out: list[tuple[_Rect, RectMergeInfo]] = []
+    for class_id, rects in by_class.items():
+        n = len(rects)
+        uf = _UnionFind(n)
+        gap_edges: set[tuple[int, int]] = set()
+        for i in range(n):
+            for j in range(i + 1, n):
+                touching, needed_gap = _rects_touch(rects[i], rects[j], gap_tolerance)
+                if touching:
+                    uf.union(i, j)
+                    if needed_gap:
+                        gap_edges.add((i, j))
+
+        components: dict[int, list[int]] = {}
+        for i in range(n):
+            components.setdefault(uf.find(i), []).append(i)
+
+        for members in components.values():
+            group = [rects[i] for i in members]
+            member_set = set(members)
+            used_gap = any(i in member_set and j in member_set for i, j in gap_edges)
+            merged_from = [rects[i].id for i in members]
+
+            if len(group) == 1:
+                out.append((group[0], RectMergeInfo(merged_from, True, False, "none")))
+                continue
+
+            r0b = min(r.r0 for r in group)
+            c0b = min(r.c0 for r in group)
+            r1b = max(r.r1 for r in group)
+            c1b = max(r.c1 for r in group)
+            union_area = sum(r.area for r in group)
+            bbox_area = (r1b - r0b + 1) * (c1b - c0b + 1)
+
+            if union_area == bbox_area:
+                merged = _Rect(id=-1, class_id=class_id, r0=r0b, c0=c0b, r1=r1b, c1=c1b)
+                out.append((merged, RectMergeInfo(merged_from, True, used_gap, "exact")))
+                continue
+
+            strategy = fit_strategy
+            if strategy == "bounding_box" and allow_overlap_check is not None \
+                    and allow_overlap_check(class_id, r0b, c0b, r1b, c1b):
+                strategy = "max_inscribed"  # bbox would encroach on another class; fall back safely
+
+            if strategy == "bounding_box":
+                merged = _Rect(id=-1, class_id=class_id, r0=r0b, c0=c0b, r1=r1b, c1=c1b)
+            else:
+                local = np.zeros((r1b - r0b + 1, c1b - c0b + 1), dtype=bool)
+                for r in group:
+                    local[r.r0 - r0b : r.r1 - r0b + 1, r.c0 - c0b : r.c1 - c0b + 1] = True
+                lr0, lc0, lr1, lc1 = _max_inscribed_rect(local)
+                merged = _Rect(
+                    id=-1, class_id=class_id,
+                    r0=r0b + lr0, c0=c0b + lc0, r1=r0b + lr1, c1=c0b + lc1,
+                )
+
+            fit_quality = min(merged.area, union_area) / max(merged.area, union_area)
+            if fit_quality < min_coverage:
+                # Reshaping would lose/overclaim too much area -- leave the
+                # group as its original individual rectangles instead.
+                for r in group:
+                    out.append((r, RectMergeInfo([r.id], True, False, "rejected_low_coverage")))
+                continue
+
+            out.append((merged, RectMergeInfo(merged_from, False, used_gap, strategy)))
+
+    return out
+
+
+@dataclass
+class ClassMergeStats:
+    """Per-class diagnostic counts from one merge_planar_surface() call."""
+    class_id: int
+    class_name: str
+    before: int              # polygon count before merging
+    after: int                # rectangle count after merging (== components, minus
+    #                           rejected components which re-expand to their originals)
+    exact_merges: int         # groups of size > 1 that merged with no reshaping
+    approx_merges: int        # groups of size > 1 accepted after reshaping (lossy)
+    gap_tolerance_merges: int  # groups of size > 1 whose connectivity needed gap_tolerance > 0
+    fallback_count: int       # 'bounding_box' requests that fell back to 'max_inscribed'
+    rejected_low_coverage: int  # groups reshaped but rejected by min_coverage, left unmerged
+
+
+@dataclass
+class MergeSummary:
+    """Diagnostics for one merge_planar_surface() call, one entry per class."""
+    per_class: list[ClassMergeStats] = field(default_factory=list)
+
+    def print_report(self) -> None:
+        if not self.per_class:
+            print("[merge] no sub-surfaces to merge.")
+            return
+        print(f"[merge] {'class':<22} {'before':>7} {'after':>7} {'exact':>7} "
+              f"{'approx':>7} {'gap-tol':>8} {'fallback':>9} {'rejected':>9}")
+        for s in self.per_class:
+            print(f"[merge] {s.class_name:<22} {s.before:>7} {s.after:>7} "
+                  f"{s.exact_merges:>7} {s.approx_merges:>7} {s.gap_tolerance_merges:>8} "
+                  f"{s.fallback_count:>9} {s.rejected_low_coverage:>9}")
+
+
+def _polygon_uv_bounds(poly: np.ndarray, surface: "PlanarSurface") -> tuple[float, float, float, float]:
+    """(u_min, u_max, v_min, v_max) of a planar quad's corners, in `surface`'s own basis.
+
+    RANSAC-fitted surfaces (`axis` u/v/z/x/y, offset_method='ransac', and
+    `project_axis_aligned` output — all set `normal`/`origin`/`e_u`/`e_v`)
+    reverse exactly via `project_to_plane`. Legacy literal axes ('x'/'y'/'z',
+    offset_method mode/median/outer) reverse exactly too: no rotation is ever
+    applied to those polygons, so the two non-flattened world axes are (u, v)
+    directly. Legacy PCA-yaw axes ('u'/'v' with offset_method != 'ransac') are
+    NOT reversible from a PlanarSurface alone: `smooth_surface` rotates the
+    whole grid by the auto-detected yaw around a pivot that is a local
+    variable there, never stored on PlanarSurface, then rotates the resulting
+    polygons back into world coordinates -- recovering the original local
+    (u, v) raster grid would need that pivot, so this raises instead of
+    silently producing wrong geometry.
+    """
+    if surface.normal is not None:
+        u, v, _ = project_to_plane(poly, surface.origin, surface.e_u, surface.e_v, surface.normal)
+    elif surface.axis in _AXES:
+        a = _AXES[surface.axis]
+        u_idx, v_idx = [i for i in range(3) if i != a]
+        u, v = poly[:, u_idx], poly[:, v_idx]
+    else:
+        raise ValueError(
+            f"merge_planar_surface: legacy offset_method with axis={surface.axis!r} "
+            "(PCA-yaw 'u'/'v') can't be reversed to its local raster grid from a "
+            "PlanarSurface alone (the rotation pivot isn't stored) -- re-run "
+            "smooth_surface with offset_method='ransac' or a literal axis 'x'/'y'/'z'."
+        )
+    return float(u.min()), float(u.max()), float(v.min()), float(v.max())
+
+
+def merge_planar_surface(
+    surface: "PlanarSurface",
+    gap_tolerance: float = 0.0,
+    fit_strategy: str = "max_inscribed",
+    min_coverage: float = 0.8,
+) -> "tuple[PlanarSurface, MergeSummary]":
+    """Merge touching same-class rectangles across an already-smoothed surface.
+
+    Post-processing pass: run after `smooth_surface`/`project_axis_aligned`
+    have produced `surface.subsurfaces[*].polygons` (via `_greedy_rectangles`)
+    and before export (`to_openstudio_json`). Rebuilds each SubSurface's
+    polygons as integer raster-cell rectangles -- exact, since they were built
+    as exact multiples of `surface.voxel_size` from a single shared (u0, v0)
+    origin in the first place, so any freshly-computed shared origin recovers
+    the same integer lattice (see `_polygon_uv_bounds`) -- merges touching /
+    near-touching same-class rectangles (`_merge_adjacent_rectangles`), then
+    re-emits world quads via the same `_quad_uv`/`_quad` helpers the original
+    smoothing used, so the output is indistinguishable in shape from a surface
+    `_greedy_rectangles` had produced directly.
+
+    gap_tolerance: metres; rounded UP to whole raster cells (the raster has no
+        finer resolution than one cell, so any positive value bridges at
+        least one empty cell) -- 0.0 (default) means exact zero-gap contact
+        only (base merging). A real gap up to this size, along the shared
+        edge, is treated as the same physical feature and bridged.
+    fit_strategy: 'max_inscribed' (default, shrink-to-fit, never overclaims
+        area) or 'bounding_box' (grow-to-fit, never loses detected area, but
+        can absorb gap cells -- guarded against encroaching on another
+        class's rectangles). See `_merge_adjacent_rectangles`.
+    min_coverage: (0, 1], default 0.8. On a real surface, "touching" is
+        transitive, so a dominant/background class (e.g. wall) typically
+        forms one sprawling connected component across the whole surface,
+        not many small local clusters -- reshaping *that* to a single
+        rectangle would discard (max_inscribed) or overclaim (bounding_box)
+        most of it. A reshaped rectangle is only accepted if it retains at
+        least this fraction of the group's true union area in both
+        directions; components that fail are left as their original,
+        unmerged rectangles instead (see `_merge_adjacent_rectangles`).
+
+    Returns a new `PlanarSurface` (the input is left untouched, matching
+    `project_axis_aligned`'s convention) plus a `MergeSummary` for diagnostics
+    (`MergeSummary.print_report()`).
+    """
+    if fit_strategy not in ("max_inscribed", "bounding_box"):
+        raise ValueError(f"fit_strategy must be 'max_inscribed' or 'bounding_box' (got {fit_strategy!r})")
+    if gap_tolerance < 0:
+        raise ValueError("gap_tolerance must be >= 0")
+    if not (0.0 < min_coverage <= 1.0):
+        raise ValueError("min_coverage must be in (0.0, 1.0]")
+
+    cell = surface.voxel_size
+    gap_cells = int(np.ceil(gap_tolerance / cell - 1e-9)) if gap_tolerance > 0 else 0
+
+    all_polys = [poly for sub in surface.subsurfaces for poly in sub.polygons]
+    if not all_polys:
+        return surface, MergeSummary([])
+
+    all_bounds = [_polygon_uv_bounds(poly, surface) for poly in all_polys]
+    u0 = min(b[0] for b in all_bounds)
+    v0 = min(b[2] for b in all_bounds)
+
+    def _to_rect(poly: np.ndarray, class_id: int, local_id: int) -> _Rect:
+        umin, umax, vmin, vmax = _polygon_uv_bounds(poly, surface)
+        r0 = int(round((umin - u0) / cell))
+        r1 = int(round((umax - u0) / cell)) - 1
+        c0 = int(round((vmin - v0) / cell))
+        c1 = int(round((vmax - v0) / cell)) - 1
+        return _Rect(id=local_id, class_id=class_id, r0=r0, c0=c0, r1=r1, c1=c1)
+
+    per_class_rects: dict[int, list[_Rect]] = {
+        sub.class_id: [_to_rect(poly, sub.class_id, i) for i, poly in enumerate(sub.polygons)]
+        for sub in surface.subsurfaces
+    }
+    all_rects = [r for rects in per_class_rects.values() for r in rects]
+
+    def _overlaps_other_class(class_id: int, r0: int, c0: int, r1: int, c1: int) -> bool:
+        for other_id, rects in per_class_rects.items():
+            if other_id == class_id:
+                continue
+            for r in rects:
+                if r0 <= r.r1 and r.r0 <= r1 and c0 <= r.c1 and r.c0 <= c1:
+                    return True
+        return False
+
+    merged = _merge_adjacent_rectangles(
+        all_rects, gap_tolerance=gap_cells, fit_strategy=fit_strategy, min_coverage=min_coverage,
+        allow_overlap_check=_overlaps_other_class,
+    )
+    merged_by_class: dict[int, list[tuple[_Rect, RectMergeInfo]]] = {}
+    for rect, info in merged:
+        merged_by_class.setdefault(rect.class_id, []).append((rect, info))
+
+    is_ransac_basis = surface.normal is not None
+    if not is_ransac_basis:
+        a = _AXES[surface.axis]
+        u_idx, v_idx = [i for i in range(3) if i != a]
+
+    new_subsurfaces = []
+    stats = []
+    for sub in surface.subsurfaces:
+        group = merged_by_class.get(sub.class_id, [])
+        polys, infos = [], []
+        for rect, info in group:
+            uu0, uu1 = u0 + rect.r0 * cell, u0 + (rect.r1 + 1) * cell
+            vv0, vv1 = v0 + rect.c0 * cell, v0 + (rect.c1 + 1) * cell
+            if is_ransac_basis:
+                polys.append(_quad_uv(uu0, uu1, vv0, vv1, surface.origin, surface.e_u, surface.e_v))
+            else:
+                polys.append(_quad(uu0, uu1, vv0, vv1, surface.plane_coord, a, u_idx, v_idx))
+            infos.append(info)
+        new_subsurfaces.append(
+            SubSurface(sub.class_id, sub.class_name, sub.role, polys, merge_info=infos)
+        )
+
+        exact_merges = sum(1 for _, i in group if i.exact and len(i.merged_from) > 1)
+        approx_merges = sum(1 for _, i in group if not i.exact)
+        gap_merges = sum(1 for _, i in group if i.used_gap_tolerance)
+        fallback = sum(
+            1 for _, i in group
+            if fit_strategy == "bounding_box" and i.fit_strategy_used == "max_inscribed"
+        )
+        rejected = sum(1 for _, i in group if i.fit_strategy_used == "rejected_low_coverage")
+        stats.append(ClassMergeStats(
+            sub.class_id, sub.class_name, len(sub.polygons), len(group),
+            exact_merges, approx_merges, gap_merges, fallback, rejected,
+        ))
+
+    new_surface = replace(surface, subsurfaces=new_subsurfaces)
+    return new_surface, MergeSummary(stats)
 
 
 @dataclass
@@ -731,9 +1226,8 @@ def _smooth_surface_ransac(
     # Class-zone the flattened voxels on the in-plane (u, v) lattice (cell =
     # voxel size), then cover each class with greedy rectangles -> quads.
     u0, v0 = float(u[inlier].min()), float(v[inlier].min())
-    iu = np.floor((u[inlier] - u0) / vs).astype(np.int64)
-    iv = np.floor((v[inlier] - v0) / vs).astype(np.int64)
-    raster, i0, j0 = _zone_by_class(np.column_stack([iu, iv]), labels[inlier])
+    iu, iv, src = _footprint_cells(centers[inlier], vs, origin, e_u, e_v, n, u0, v0)
+    raster, i0, j0 = _zone_by_class(np.column_stack([iu, iv]), labels[inlier][src])
     raster, surface.n_filled, surface.n_unknown = fill_enclosed_cells(raster)
 
     for cid in np.unique(raster[raster >= 0]):
@@ -858,9 +1352,10 @@ def project_axis_aligned(
         return out
 
     u0, v0 = float(u[inlier].min()), float(v[inlier].min())
-    iu = np.floor((u[inlier] - u0) / cell).astype(np.int64)
-    iv = np.floor((v[inlier] - v0) / cell).astype(np.int64)
-    raster, i0, j0 = _zone_by_class(np.column_stack([iu, iv]), labels[inlier])
+    iu, iv, src = _footprint_cells(
+        centers[inlier], grid.voxel_size, origin, e_h, e_w, n, u0, v0, pitch=cell,
+    )
+    raster, i0, j0 = _zone_by_class(np.column_stack([iu, iv]), labels[inlier][src])
     raster = _drop_small_components(raster, cell, min_side_m)
 
     for cid in np.unique(raster[raster >= 0]):
@@ -946,14 +1441,17 @@ def to_openstudio_json(surface: PlanarSurface, path: str | Path) -> Path:
     """Write the planar surface as OpenStudio-friendly JSON (polygons + roles).
 
     Schema: {axis, plane_coord, rotation_deg, voxel_size, normal, surfaces:
-    [{class_id, class_name, role, polygons: [[[x,y,z], x4], ...]}],
+    [{class_id, class_name, role, polygons: [[[x,y,z], x4], ...], merge_info}],
     n_inliers, n_deviations}. Polygon vertices are in world coordinates and are
     planar by construction (RANSAC: they share the fitted plane; legacy x/y/z:
     they share `plane_coord`; legacy u/v: they share it once rotated by
     -rotation_deg back into the building-aligned frame). Wound CCW about the
     +normal. `role` maps envelope classes to a base Surface and fenestration
     classes to a SubSurface downstream. `normal` is the unit plane normal for
-    the RANSAC fit, else null.
+    the RANSAC fit, else null. `merge_info` (parallel to `polygons`) is null
+    unless the surface went through `merge_planar_surface`, in which case each
+    entry is {merged_from, exact, used_gap_tolerance, fit_strategy_used} — see
+    `RectMergeInfo`.
     """
     doc = {
         "axis": surface.axis,
@@ -969,6 +1467,17 @@ def to_openstudio_json(surface: PlanarSurface, path: str | Path) -> Path:
                 "class_name": s.class_name,
                 "role": s.role,
                 "polygons": [poly.tolist() for poly in s.polygons],
+                "merge_info": (
+                    None if s.merge_info is None else [
+                        {
+                            "merged_from": mi.merged_from,
+                            "exact": mi.exact,
+                            "used_gap_tolerance": mi.used_gap_tolerance,
+                            "fit_strategy_used": mi.fit_strategy_used,
+                        }
+                        for mi in s.merge_info
+                    ]
+                ),
             }
             for s in surface.subsurfaces
         ],

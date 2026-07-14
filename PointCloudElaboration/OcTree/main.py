@@ -94,6 +94,37 @@ def parse_args():
         "box reaches this many metres on at least one side (default 1.0)",
     )
     p.add_argument(
+        "--merge-adjacent", action="store_true",
+        help="Merge touching same-class rectangles into single rectangles after "
+        "smoothing (base merging: exact zero-gap edge contact; corner-only "
+        "contact never counts). Runs before OpenStudio export/render",
+    )
+    p.add_argument(
+        "--merge-gap-tolerance", type=float, default=0.0, metavar="M",
+        help="Extended merging (needs --merge-adjacent): also bridge rectangles "
+        "separated by a gap of at most this many metres along their shared edge "
+        "(rounded up to whole raster cells -- any value > 0 bridges >= 1 cell). "
+        "Ignored with a warning if --merge-adjacent is not set. Try ~0.5x "
+        "voxel-size as a starting point (default 0.0: off)",
+    )
+    p.add_argument(
+        "--merge-fit-strategy", choices=("max_inscribed", "bounding_box"), default="max_inscribed",
+        help="How to reshape a non-rectangular merged group: 'max_inscribed' "
+        "(default) shrinks to the largest rectangle within the true detected "
+        "footprint (never overclaims area, can drop real cells); 'bounding_box' "
+        "grows to contain the whole group (never loses detected area, can "
+        "absorb gap cells -- guarded against encroaching on another class)",
+    )
+    p.add_argument(
+        "--merge-min-coverage", type=float, default=0.8, metavar="FRACTION",
+        help="Reject a reshaped merge (leaving it as its original, unmerged "
+        "rectangles) unless it retains at least this fraction of the group's "
+        "true area (0,1]. On real data a dominant class like wall usually "
+        "forms one sprawling touching component spanning the whole surface; "
+        "without this gate reshaping it to one rectangle would discard or "
+        "overclaim most of it (default 0.8)",
+    )
+    p.add_argument(
         "--export-openstudio", default=None, metavar="PATH.json",
         help="Smooth and write OpenStudio-friendly polygon JSON, then exit",
     )
@@ -160,6 +191,9 @@ def main():
 
     effective_min = args.min_count if args.filter else 1
 
+    if args.merge_gap_tolerance and not args.merge_adjacent:
+        print("--merge-gap-tolerance has no effect without --merge-adjacent; ignoring.", file=sys.stderr)
+
     if args.export_openstudio:
         from octree import smooth_surface, to_openstudio_json, voxelize
         from octree.voxelizer import filter_by_count
@@ -181,6 +215,21 @@ def main():
                 grid, surface, min_side_m=args.min_side, tolerance_voxels=args.tolerance,
             )
             print(f"Re-projected onto world-axis-aligned grid (min-side {args.min_side:.2f} m).")
+        if args.merge_adjacent:
+            from octree import merge_planar_surface
+
+            if surface.normal is None and args.smooth_axis in ("u", "v"):
+                print(
+                    "--merge-adjacent needs --offset-method ransac when --smooth-axis "
+                    "is 'u'/'v' (legacy PCA-yaw u/v can't be reversed to its raster grid)",
+                    file=sys.stderr,
+                )
+                return 2
+            surface, merge_summary = merge_planar_surface(
+                surface, gap_tolerance=args.merge_gap_tolerance, fit_strategy=args.merge_fit_strategy,
+                min_coverage=args.merge_min_coverage,
+            )
+            merge_summary.print_report()
         path = to_openstudio_json(surface, args.export_openstudio)
         if surface.normal is not None:
             n = surface.normal
@@ -206,6 +255,8 @@ def main():
             rotation_deg=args.rotation_deg, ransac_threshold=args.ransac_threshold,
             ransac_iters=args.ransac_iters, seed=args.seed,
             axis_aligned=args.project_to_axis_aligned, min_side=args.min_side,
+            merge_adjacent=args.merge_adjacent, merge_gap_tolerance=args.merge_gap_tolerance,
+            merge_fit_strategy=args.merge_fit_strategy, merge_min_coverage=args.merge_min_coverage,
         )
         print(f"Wrote {args.screenshot}  (voxel {args.voxel_size:.2f} m)")
         return 0
@@ -222,6 +273,8 @@ def main():
         rotation_deg=args.rotation_deg, ransac_threshold=args.ransac_threshold,
         ransac_iters=args.ransac_iters, seed=args.seed,
         axis_aligned_on=args.project_to_axis_aligned, min_side=args.min_side,
+        merge_adjacent_on=args.merge_adjacent, merge_gap_tolerance=args.merge_gap_tolerance,
+        merge_fit_strategy=args.merge_fit_strategy, merge_min_coverage=args.merge_min_coverage,
     )
     return 0
 
