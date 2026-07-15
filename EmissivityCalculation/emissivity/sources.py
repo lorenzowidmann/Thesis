@@ -56,6 +56,35 @@ class WebcamSource(FrameSource):
         self.cap.release()
 
 
+class ZedUvcSource(FrameSource):
+    """ZED 2i left-eye RGB frames via plain UVC (OpenCV), no ZED SDK/GPU needed.
+
+    Over USB the ZED 2i exposes itself as one wide webcam whose frame is the
+    left+right stereo pair concatenated side by side (unrectified). This just
+    opens it like any other webcam and crops the left half -- no depth, no
+    rectification, but that's not needed for a color crop fed to CLIP.
+    """
+
+    def __init__(self, index: int = 0):
+        import cv2
+
+        self._cv2 = cv2
+        self.cap = cv2.VideoCapture(index)
+        if not self.cap.isOpened():
+            raise RuntimeError(f"Could not open ZED camera (UVC) at index {index}")
+
+    def grab(self) -> np.ndarray:
+        ok, frame_bgr = self.cap.read()
+        if not ok:
+            raise RuntimeError("Failed to grab frame from ZED camera (UVC)")
+        rgb = self._cv2.cvtColor(frame_bgr, self._cv2.COLOR_BGR2RGB)
+        left, _right = np.split(rgb, 2, axis=1)
+        return left
+
+    def close(self) -> None:
+        self.cap.release()
+
+
 class ZedSource(FrameSource):
     """ZED 2i left-eye RGB frames via the ZED SDK Python API (pyzed)."""
 

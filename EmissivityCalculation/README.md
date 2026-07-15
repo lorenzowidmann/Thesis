@@ -22,7 +22,10 @@ pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
 ```
 
-The first run downloads the CLIP model (~600 MB) from Hugging Face.
+The first run downloads the CLIP model (~600 MB) from Hugging Face, cached at
+`~/.cache/huggingface/hub` (shared across venvs/projects on this account — it
+never re-downloads afterward, and doesn't expire). Every run after that prints
+`Loading cached CLIP model...` and loads straight from disk in a few seconds.
 
 ## Usage
 
@@ -35,11 +38,19 @@ python main.py --image test_images/brick.jpg
 # From the default webcam, with a display window
 python main.py --webcam --show
 
-# From the ZED 2i (requires ZED SDK, see below)
+# From the ZED 2i via the official SDK (requires pyzed + NVIDIA GPU/CUDA, see below)
 python main.py --zed --show
+
+# From the ZED 2i as a plain UVC webcam (OpenCV only, no SDK/GPU needed)
+python main.py --zed-uvc --show
+python main.py --zed-uvc --camera-index 1 --show   # if it's not device 0
 
 # Restrict classification to a region: center-x, center-y, width, height (px)
 python main.py --image photo.jpg --roi 320,240,200,200
+
+# Live mode: keep grabbing + classifying frames (model loaded once) until you
+# press 'q' in the window or Ctrl+C. Needs --show and a camera source.
+python main.py --zed-uvc --show --live
 ```
 
 Output: top-3 material matches with confidence and their tabulated emissivity
@@ -68,17 +79,26 @@ Add a row to `emissivity_table.csv`:
 The classifier's classes are generated from this table, so new rows are
 immediately classifiable — no retraining.
 
-## ZED 2i camera (later)
+## ZED 2i camera
 
-The `--zed` source needs the ZED SDK, which is not yet installed on this PC:
+Two ways to read the camera, depending on hardware:
 
-1. Install the ZED SDK: https://www.stereolabs.com/developers/release/
-   (requires an NVIDIA GPU with CUDA)
-2. Run the SDK's `get_python_api.py` to install `pyzed` into the venv.
+**`--zed-uvc`** (works on this PC — no NVIDIA GPU here): the ZED 2i also
+shows up as a plain USB webcam. Over UVC its frame is the left+right stereo
+pair concatenated side by side (unrectified); `ZedUvcSource` just opens it
+with OpenCV like any webcam and crops the left half. No depth, no
+rectification — not needed here since only a color crop is fed to CLIP.
+Use `--camera-index` if it isn't device 0 (e.g. a laptop's built-in webcam
+is usually 0, so the ZED may enumerate as 1 or 2).
+
+**`--zed`** (needs the official SDK): only worth it if you later need depth
+or rectified stereo. Requires:
+
+1. Installing the ZED SDK: https://www.stereolabs.com/developers/release/
+   (requires an NVIDIA GPU with CUDA — not available on this PC)
+2. Running the SDK's `get_python_api.py` to install `pyzed` into the venv.
    Note: pyzed may not support Python 3.13 yet — if installation fails,
    recreate the venv with `py -3.12 -m venv C:\venvs\emissivity`.
-
-Until then, develop with `--image` or `--webcam`.
 
 ## Structure
 
@@ -89,7 +109,7 @@ EmissivityCalculation/
 ├── emissivity/
 │   ├── table.py             # EmissivityTable: CSV loading + lookup
 │   ├── classifier.py        # MaterialClassifier: CLIP zero-shot
-│   └── sources.py           # ImageSource / WebcamSource / ZedSource
+│   └── sources.py           # ImageSource / WebcamSource / ZedSource / ZedUvcSource
 ├── test_images/             # sample images for development
 └── requirements.txt
 ```

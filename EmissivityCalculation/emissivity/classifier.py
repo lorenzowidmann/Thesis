@@ -13,11 +13,28 @@ from .table import EmissivityTable
 MODEL_NAME = "openai/clip-vit-base-patch32"
 
 
+def _is_cached(model_name: str) -> bool:
+    """Best-effort check for a local snapshot, just to print an honest message
+    -- from_pretrained() below still handles the actual cache lookup/download."""
+    from huggingface_hub import scan_cache_dir
+
+    try:
+        repos = scan_cache_dir().repos
+    except Exception:
+        return False
+    return any(r.repo_id == model_name and r.size_on_disk > 0 for r in repos)
+
+
 class MaterialClassifier:
     def __init__(self, table: EmissivityTable, model_name: str = MODEL_NAME):
         # Heavy imports kept local so the rest of the package loads fast.
         import torch
         from transformers import CLIPModel, CLIPProcessor
+
+        print(
+            "Loading cached CLIP model..." if _is_cached(model_name)
+            else "Downloading CLIP model (~600 MB, first run only)..."
+        )
 
         self._torch = torch
         self.table = table
