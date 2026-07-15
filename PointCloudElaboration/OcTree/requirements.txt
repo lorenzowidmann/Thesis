@@ -1,3 +1,5 @@
 numpy
 laspy[lazrs]   # .las / .laz reading (lazrs backend for compressed files)
 pyvista        # 3D visualization (pulls in VTK)
+# .db3 rosbag2 support (octree/rosbag_loader.py) uses only stdlib sqlite3 +
+# a built-in CDR decoder -- no extra package needed.

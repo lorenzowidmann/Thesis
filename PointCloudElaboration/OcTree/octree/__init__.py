@@ -1,5 +1,6 @@
 from .classes import CLASSES, class_name, colorize
 from .las_loader import PointCloud, load_las
+from .rosbag_loader import load_db3
 from .octree import build_octree, leaf_voxels, level_counts
 from .smoothing import (
     ClassMergeStats,
@@ -31,6 +32,7 @@ from .voxelizer import (
 
 __all__ = [
     "load_las",
+    "load_db3",
     "PointCloud",
     "voxelize",
     "voxelize_octree",

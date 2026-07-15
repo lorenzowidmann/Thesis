@@ -80,6 +80,10 @@ DEFAULT_MERGE_MIN_COVERAGE = 0.8
 POINT_COLOR = "black"
 POINT_SIZE = 4.0
 
+# Sphere-glyphed points look nicer but are far more expensive to rotate/pan
+# than flat GPU point sprites -- past this count, render as flat points.
+SPHERE_POINT_LIMIT = 200_000
+
 # When points are shown, the voxels are drawn as class-colored wireframe cages
 # (same colors as the solid mode) so the opaque cube faces don't hide the black
 # points inside them; when hidden, the voxels are solid and class-colored.
@@ -186,7 +190,7 @@ def _add_points(pl, points, max_points):
     cloud = pv.PolyData(pts)
     return pl.add_mesh(
         cloud, color=POINT_COLOR, point_size=POINT_SIZE,
-        render_points_as_spheres=True, name="points",
+        render_points_as_spheres=len(pts) <= SPHERE_POINT_LIMIT, name="points",
     )
 
 

@@ -25,6 +25,7 @@ from octree import (
     class_name,
     leaf_voxels,
     level_counts,
+    load_db3,
     load_las,
     root_extent,
     voxelize_octree,
@@ -36,6 +37,24 @@ DEFAULT_LAS = Path(__file__).resolve().parent / "data" / "DEBY_LOD2_4959459.las"
 def parse_args():
     p = argparse.ArgumentParser(description="Octree voxel sampling + viewer")
     p.add_argument("--las", default=str(DEFAULT_LAS), help="Path to a .las file")
+    p.add_argument(
+        "--db3", default=None,
+        help="Path to a rosbag2 .db3 file (overrides --las). Merges every "
+        "PointCloud2 scan message on the chosen topic into one cloud.",
+    )
+    p.add_argument(
+        "--db3-topic", default=None, metavar="NAME",
+        help="PointCloud2 topic to read from the bag (default: auto-detect "
+        "if the bag has exactly one)",
+    )
+    p.add_argument(
+        "--db3-stride", type=int, default=1, metavar="N",
+        help="Use every Nth scan message when merging (default 1: use all)",
+    )
+    p.add_argument(
+        "--db3-point-stride", type=int, default=1, metavar="N",
+        help="Keep every Nth point within each kept scan (default 1: use all)",
+    )
     p.add_argument(
         "--voxel-size", type=float, default=0.20,
         help="Initial voxel edge in metres (GUI slider range 0.05-1.0)",
@@ -179,8 +198,18 @@ def selftest(pc):
 def main():
     args = parse_args()
 
-    print(f"Loading {args.las} ...")
-    pc = load_las(args.las)
+    if args.db3:
+        stride_note = f"stride {args.db3_stride}"
+        if args.db3_point_stride != 1:
+            stride_note += f", point-stride {args.db3_point_stride}"
+        print(f"Loading {args.db3} ({stride_note}) ...")
+        pc = load_db3(
+            args.db3, topic=args.db3_topic, stride=args.db3_stride,
+            point_stride=args.db3_point_stride,
+        )
+    else:
+        print(f"Loading {args.las} ...")
+        pc = load_las(args.las)
 
     if args.info:
         print_info(pc)

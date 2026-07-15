@@ -36,18 +36,30 @@ class VoxelGrid:
 
 def _grid_from_index(idx, labels, voxel_size, origin) -> VoxelGrid:
     """Collapse integer cell indices into a VoxelGrid (center + majority class)."""
-    keys, inverse, counts = np.unique(
-        idx, axis=0, return_inverse=True, return_counts=True
+    # Pack the (i, j, k) cell index into a single int64 key so uniqueness is
+    # found with a 1-D sort instead of np.unique(axis=0)'s multi-column
+    # lexsort -- an order of magnitude faster on multi-million-point clouds.
+    lo = idx.min(axis=0)
+    shifted = idx - lo
+    ranges = shifted.max(axis=0) + 1
+    key = (
+        shifted[:, 0].astype(np.int64)
+        + shifted[:, 1].astype(np.int64) * ranges[0]
+        + shifted[:, 2].astype(np.int64) * ranges[0] * ranges[1]
+    )
+
+    _, first, inverse, counts = np.unique(
+        key, return_index=True, return_inverse=True, return_counts=True
     )
     inverse = inverse.ravel()
-    n_vox = len(keys)
+    n_vox = len(first)
 
-    centers = (keys + 0.5) * voxel_size + origin
+    centers = (idx[first] + 0.5) * voxel_size + origin
 
     n_classes = MAX_CLASS_ID + 1
     clipped = np.clip(labels, 0, MAX_CLASS_ID).astype(np.int64)
-    hist = np.zeros((n_vox, n_classes), dtype=np.int64)
-    np.add.at(hist, (inverse, clipped), 1)
+    flat = inverse * n_classes + clipped
+    hist = np.bincount(flat, minlength=n_vox * n_classes).reshape(n_vox, n_classes)
     majority = hist.argmax(axis=1).astype(np.int32)
 
     return VoxelGrid(

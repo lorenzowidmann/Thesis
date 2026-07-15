@@ -149,6 +149,17 @@ archives live **outside** this repo (e.g. `C:\Users\loren\Desktop\tum-facade`);
 `extract_sample.py` unpacks a single `.las` into `data/` (git-ignored). The
 default sample is `DEBY_LOD2_4959459` (~1.05M points, ~41 m cube).
 
+**Rosbag2 (`.db3`) input**, as an alternative to `.las`: `--db3 path/to/bag.db3`
+reads a ROS2 rosbag2 sqlite3 bag directly (`octree/rosbag_loader.py`, stdlib
+`sqlite3` + a small built-in CDR decoder — no ROS install needed), merging
+every `sensor_msgs/msg/PointCloud2` message on one topic (`--db3-topic`, auto-
+detected if the bag has exactly one) into a single unlabeled cloud. Real SLAM
+bags run into millions of points per topic, so two independent subsampling
+knobs keep it usable: `--db3-stride N` keeps every Nth *scan message*, and
+`--db3-point-stride N` keeps every Nth *point within* each kept scan (applied
+before the float64 conversion, so it also cuts load time/memory, not just the
+final count). They compose freely.
+
 ## Setup
 
 Open3D has no Python 3.13 wheels, so this module uses **laspy + PyVista**, which
@@ -220,6 +231,10 @@ python main.py --export-openstudio surfaces.json --smooth-axis u --voxel-size 0.
 
 # Consistency checks (octree leaves == voxelizer voxels, monotonicity)
 python main.py --selftest
+
+# Load a rosbag2 .db3 instead of a .las, subsampling scans and/or points
+python main.py --db3 path\to\bag.db3 --info
+python main.py --db3 path\to\bag.db3 --db3-topic /cloud_registered --db3-stride 5 --db3-point-stride 10
 ```
 
 **Viewer controls.** The lower slider sets the voxel edge in metres (0.05 m
@@ -278,6 +293,7 @@ OcTree/
 ├── extract_sample.py    # unpack one .las from a TUM-FACADE .7z into data/
 ├── octree/
 │   ├── las_loader.py         # read .las -> points + semantic labels (robust to label field)
+│   ├── rosbag_loader.py      # read rosbag2 .db3 (PointCloud2/CDR) -> points, with scan/point stride
 │   ├── voxelizer.py          # voxelize(), voxelize_octree(), filter_by_count() (numpy)
 │   ├── octree.py             # OctreeNode, build_octree(), level_counts(), leaf_voxels()
 │   ├── smoothing.py          # RANSAC plane fit + smooth_surface() -> PlanarSurface, project_axis_aligned(), to_openstudio_json()

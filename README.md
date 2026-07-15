@@ -72,6 +72,11 @@ processing pipeline, each stage behind a toggle, in an interactive PyVista GUI:
    Exports OpenStudio-friendly polygon JSON (with an optional `.osm` SDK
    adapter).
 
+Also reads real SLAM data directly: `--db3 bag.db3` loads a rosbag2 sqlite3
+bag's `PointCloud2` scans (stdlib only, no ROS install), with `--db3-stride`
+and `--db3-point-stride` to subsample scans/points on the often much larger
+real-world clouds.
+
 Runs on Python 3.13 with `laspy` + `PyVista` (pure numpy for the RANSAC path).
 
 Output: a voxel/planar-surface representation of the scene — OpenStudio-ready
