@@ -10,6 +10,17 @@ from pathlib import Path
 import numpy as np
 
 
+def _open_capture(cv2, device: int | str):
+    """cv2.VideoCapture(int) enumerates devices per-backend, and on Linux the
+    V4L2/FFmpeg backends can disagree about which /dev/videoN a given index
+    maps to (or even how many devices exist) -- multi-node UVC cameras like
+    the ZED 2i are especially prone to this. A device *path* (e.g.
+    "/dev/video1") sidesteps that by opening the node directly via V4L2."""
+    if isinstance(device, str) and device.startswith("/dev/"):
+        return cv2.VideoCapture(device, cv2.CAP_V4L2)
+    return cv2.VideoCapture(device)
+
+
 class FrameSource(ABC):
     @abstractmethod
     def grab(self) -> np.ndarray:
@@ -38,11 +49,11 @@ class ImageSource(FrameSource):
 
 
 class WebcamSource(FrameSource):
-    def __init__(self, index: int = 0):
+    def __init__(self, index: int | str = 0):
         import cv2
 
         self._cv2 = cv2
-        self.cap = cv2.VideoCapture(index)
+        self.cap = _open_capture(cv2, index)
         if not self.cap.isOpened():
             raise RuntimeError(f"Could not open webcam {index}")
 
@@ -65,11 +76,11 @@ class ZedUvcSource(FrameSource):
     rectification, but that's not needed for a color crop fed to CLIP.
     """
 
-    def __init__(self, index: int = 0):
+    def __init__(self, index: int | str = 0):
         import cv2
 
         self._cv2 = cv2
-        self.cap = cv2.VideoCapture(index)
+        self.cap = _open_capture(cv2, index)
         if not self.cap.isOpened():
             raise RuntimeError(f"Could not open ZED camera (UVC) at index {index}")
 

@@ -60,6 +60,11 @@ python main.py --zed --show
 python main.py --zed-uvc --show
 python main.py --zed-uvc --camera-index 1 --show   # if it's not device 0
 
+# On Linux, --camera-index also takes a device path -- use this if OpenCV's
+# numeric index doesn't match reality (common with multi-node UVC cameras
+# like the ZED 2i). Check the real node with `v4l2-ctl --list-devices` first.
+python main.py --zed-uvc --camera-index /dev/video1 --show
+
 # Restrict classification to a region: center-x, center-y, width, height (px)
 python main.py --image photo.jpg --roi 320,240,200,200
 

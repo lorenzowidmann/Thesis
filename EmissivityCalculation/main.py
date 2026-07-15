@@ -41,8 +41,12 @@ def parse_args():
         "crops the left eye out of the side-by-side stereo frame)",
     )
     p.add_argument(
-        "--camera-index", type=int, default=0, metavar="N",
-        help="Device index for --webcam / --zed-uvc (default 0)",
+        "--camera-index", default="0", metavar="N",
+        help="Device index for --webcam / --zed-uvc (default 0). On Linux, also "
+        "accepts a device path like /dev/video1 -- useful when OpenCV's numeric "
+        "index doesn't line up with the actual node, which happens with "
+        "multi-node UVC cameras like the ZED 2i (check with 'v4l2-ctl "
+        "--list-devices')",
     )
     p.add_argument(
         "--roi",
@@ -84,6 +88,15 @@ def roi_bounds(frame: np.ndarray, roi: str) -> tuple[int, int, int, int]:
 def crop_roi(frame: np.ndarray, roi: str) -> np.ndarray:
     x0, y0, x1, y1 = roi_bounds(frame, roi)
     return frame[y0:y1, x0:x1]
+
+
+def parse_camera_index(value: str) -> int | str:
+    """"0"/"1"/... -> int for a normal numeric index; anything else (e.g. a
+    Linux device path like "/dev/video1") is passed through as-is."""
+    try:
+        return int(value)
+    except ValueError:
+        return value
 
 
 def default_center_roi(frame: np.ndarray, fraction: float = 0.5) -> str:
@@ -135,12 +148,14 @@ def main():
     table = EmissivityTable(args.table) if args.table else EmissivityTable()
     classifier = MaterialClassifier(table)
 
+    camera_index = parse_camera_index(args.camera_index)
+
     if args.image:
         source = ImageSource(args.image)
     elif args.webcam:
-        source = WebcamSource(args.camera_index)
+        source = WebcamSource(camera_index)
     elif args.zed_uvc:
-        source = ZedUvcSource(args.camera_index)
+        source = ZedUvcSource(camera_index)
     else:
         source = ZedSource()
 
