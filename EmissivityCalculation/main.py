@@ -3,6 +3,11 @@
 Grabs a frame (image file, webcam, or ZED 2i), classifies the material with
 CLIP zero-shot, and prints the tabulated emissivity of the top matches.
 
+Camera sources (--webcam/--zed/--zed-uvc) classify a centered box, not the
+whole frame, and draw it as a green aiming rectangle in --show -- only what's
+inside it is fed to CLIP. --image still classifies the whole picture. --roi
+overrides the box (either way) with an explicit cx,cy,w,h region.
+
 Usage:
     py main.py --image test_images/brick.jpg
     py main.py --webcam --show
@@ -41,7 +46,11 @@ def parse_args():
     )
     p.add_argument(
         "--roi",
-        help="Crop region cx,cy,w,h (center + size in pixels) before classification",
+        help="Crop region cx,cy,w,h (center + size in pixels) before classification. "
+        "For camera sources this defaults to a centered box (see "
+        "default_center_roi()) so --show draws a real aiming box, not just a "
+        "decorative marker -- only what's inside it is classified. --image "
+        "still defaults to the whole picture",
     )
     p.add_argument("--top-k", type=int, default=3, help="Number of matches to show")
     p.add_argument("--show", action="store_true", help="Display frame with overlay")
@@ -51,15 +60,39 @@ def parse_args():
         "press 'q' in the window or Ctrl+C. Needs --show and a camera source "
         "(--webcam/--zed/--zed-uvc), not --image",
     )
+    p.add_argument(
+        "--classify-every", type=int, default=5, metavar="N",
+        help="--live only: re-run CLIP every Nth frame (default 5); every frame "
+        "is still shown, with the last result overlaid in between. CLIP "
+        "inference (~300-400ms on CPU) is what makes --live feel laggy, not "
+        "the camera, so this decouples the smooth preview from it. Use 1 to "
+        "classify every frame",
+    )
     p.add_argument("--table", default=None, help="Path to a custom emissivity CSV")
     return p.parse_args()
 
 
-def crop_roi(frame: np.ndarray, roi: str) -> np.ndarray:
+def roi_bounds(frame: np.ndarray, roi: str) -> tuple[int, int, int, int]:
     cx, cy, w, h = (int(v) for v in roi.split(","))
     x0 = max(cx - w // 2, 0)
     y0 = max(cy - h // 2, 0)
-    return frame[y0 : y0 + h, x0 : x0 + w]
+    x1 = min(x0 + w, frame.shape[1])
+    y1 = min(y0 + h, frame.shape[0])
+    return x0, y0, x1, y1
+
+
+def crop_roi(frame: np.ndarray, roi: str) -> np.ndarray:
+    x0, y0, x1, y1 = roi_bounds(frame, roi)
+    return frame[y0:y1, x0:x1]
+
+
+def default_center_roi(frame: np.ndarray, fraction: float = 0.5) -> str:
+    """Centered square box (fraction of the frame's shorter side) so a camera
+    source can be aimed at one material instead of classifying the whole,
+    likely mixed-content, frame."""
+    h, w = frame.shape[:2]
+    side = int(min(h, w) * fraction)
+    return f"{w // 2},{h // 2},{side},{side}"
 
 
 def classify_frame(frame, classifier, table, top_k):
@@ -77,10 +110,13 @@ def classify_frame(frame, classifier, table, top_k):
     return best, results[0][1]
 
 
-def draw_overlay(frame, best, confidence):
+def draw_overlay(frame, best, confidence, roi=None):
     import cv2
 
     bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    if roi:
+        x0, y0, x1, y1 = roi_bounds(frame, roi)
+        cv2.rectangle(bgr, (x0, y0), (x1, y1), (0, 255, 0), 2)
     label = f"{best.material}: e={best.emissivity} ({confidence:.0%})"
     cv2.putText(bgr, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
     return bgr
@@ -108,18 +144,28 @@ def main():
     else:
         source = ZedSource()
 
+    is_camera = not args.image
+    roi = args.roi  # camera sources fall back to a default center box, once the
+                     # first frame's size is known -- see default_center_roi()
+
     with source:
         if args.live:
             import cv2
 
+            classify_every = max(1, args.classify_every)
             print("Live mode -- press 'q' in the image window to stop.")
+            best = confidence = None
+            frame_count = 0
             try:
                 while True:
                     frame = source.grab()
-                    if args.roi:
-                        frame = crop_roi(frame, args.roi)
-                    best, confidence = classify_frame(frame, classifier, table, args.top_k)
-                    cv2.imshow("Emissivity estimation", draw_overlay(frame, best, confidence))
+                    if roi is None and is_camera:
+                        roi = default_center_roi(frame)
+                    crop = crop_roi(frame, roi) if roi else frame
+                    if best is None or frame_count % classify_every == 0:
+                        best, confidence = classify_frame(crop, classifier, table, args.top_k)
+                    frame_count += 1
+                    cv2.imshow("Emissivity estimation", draw_overlay(frame, best, confidence, roi))
                     if cv2.waitKey(1) & 0xFF == ord("q"):
                         break
             except KeyboardInterrupt:
@@ -129,15 +175,16 @@ def main():
             return 0
 
         frame = source.grab()
-        if args.roi:
-            frame = crop_roi(frame, args.roi)
+        if roi is None and is_camera:
+            roi = default_center_roi(frame)
+        crop = crop_roi(frame, roi) if roi else frame
 
-        best, confidence = classify_frame(frame, classifier, table, args.top_k)
+        best, confidence = classify_frame(crop, classifier, table, args.top_k)
 
         if args.show:
             import cv2
 
-            cv2.imshow("Emissivity estimation", draw_overlay(frame, best, confidence))
+            cv2.imshow("Emissivity estimation", draw_overlay(frame, best, confidence, roi))
             print("Press any key in the image window to close.")
             cv2.waitKey(0)
             cv2.destroyAllWindows()

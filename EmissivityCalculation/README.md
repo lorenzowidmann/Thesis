@@ -22,6 +22,21 @@ pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
 ```
 
+Nothing in the code is Windows-specific (no OS checks, no hardcoded paths) —
+on Ubuntu/Linux, skip the short-path venv workaround:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+cd EmissivityCalculation
+pip install torch --index-url https://download.pytorch.org/whl/cpu   # or the CUDA index if there's an NVIDIA GPU
+pip install -r requirements.txt
+```
+
+`--camera-index` maps to `/dev/videoN` there instead of a Windows device
+index, and `--zed` (official SDK) is actually easier on Linux — Stereolabs
+ships first-class Linux/Jetson support. `--show` needs a display (X11/Wayland).
+
 The first run downloads the CLIP model (~600 MB) from Hugging Face, cached at
 `~/.cache/huggingface/hub` (shared across venvs/projects on this account — it
 never re-downloads afterward, and doesn't expire). Every run after that prints
@@ -52,6 +67,14 @@ python main.py --image photo.jpg --roi 320,240,200,200
 # press 'q' in the window or Ctrl+C. Needs --show and a camera source.
 python main.py --zed-uvc --show --live
 ```
+
+**Aiming box.** Camera sources (`--webcam`/`--zed`/`--zed-uvc`) classify a
+centered box — about half the frame's shorter side — instead of the whole
+frame, and `--show` draws it as a green rectangle: only what's inside it goes
+to CLIP, so you point the camera to put one material inside the box. `--image`
+is unchanged and still classifies the whole picture (a saved photo is already
+framed). Pass `--roi cx,cy,w,h` on any source to use an explicit region
+instead of the default box.
 
 Output: top-3 material matches with confidence and their tabulated emissivity
 (value + range), e.g.
