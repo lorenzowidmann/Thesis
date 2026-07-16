@@ -89,7 +89,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     g.add_argument("--zed", action="store_true", help="Needs pyzed + NVIDIA GPU/CUDA")
     g.add_argument("--zed-uvc", action="store_true", help="Plain UVC, no SDK/GPU -- default")
     g.add_argument("--shared", action="store_true",
-                    help="Read the left eye from a running CameraServer/camera_server.py "
+                    help="Read the right eye from a running CameraServer/camera_server.py "
                          "instead of opening the camera directly")
     src.add_argument("--camera-index", default="0", metavar="N")
 
@@ -106,13 +106,13 @@ def make_camera_source(args: argparse.Namespace):
     if args.image:
         return ImageSource(args.image)
     if args.shared:
-        return SharedZedSource(eye="left")
+        return SharedZedSource(eye="right")
     index = emissivity_main.parse_camera_index(args.camera_index)
     if args.webcam:
         return WebcamSource(index)
     if args.zed:
         return ZedSource()
-    return ZedUvcSource(index)  # default, incl. explicit --zed-uvc
+    return ZedUvcSource(index, eye="right")  # default, incl. explicit --zed-uvc
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -73,9 +73,9 @@ class ZedUvcSource(FrameSource):
     Over USB the ZED 2i exposes itself as one wide webcam whose frame is the
     left+right stereo pair concatenated side by side (unrectified). This just
     opens it like any other webcam and crops one half -- no depth, no
-    rectification. `eye="left"` (default) is what CLIP classification uses;
-    `eye="right"` is the second lens, e.g. for a separate driving-view feed
-    that doesn't need to match the classified crop.
+    rectification. `eye="right"` is what CLIP classification (SensorFusion)
+    uses; `eye="left"` (default) is the other lens, e.g. for a separate
+    driving-view feed that doesn't need to match the classified crop.
     """
 
     def __init__(self, index: int | str = 0, eye: str = "left"):

@@ -13,7 +13,7 @@ Usage:
     py sensor_fusion.py --once                # single measurement
     py sensor_fusion.py --image photo.jpg --once
     py sensor_fusion.py --precision accurate  # heavier CLIP model
-    py sensor_fusion.py --shared              # read the left eye from a running
+    py sensor_fusion.py --shared              # read the right eye from a running
                                                # CameraServer/camera_server.py instead
                                                # of opening the camera directly -- use
                                                # this to run alongside DriveView (Windows
@@ -85,7 +85,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     src_group.add_argument(
         "--shared", action="store_true",
-        help="Read the left eye from a running CameraServer/camera_server.py instead of "
+        help="Read the right eye from a running CameraServer/camera_server.py instead of "
              "opening the camera directly -- use this to run alongside DriveView, since "
              "Windows only lets one process own a UVC device at a time",
     )
@@ -128,13 +128,13 @@ def make_camera_source(args: argparse.Namespace):
     if args.image:
         return ImageSource(args.image)
     if args.shared:
-        return SharedZedSource(eye="left")
+        return SharedZedSource(eye="right")
     index = emissivity_main.parse_camera_index(args.camera_index)
     if args.webcam:
         return WebcamSource(index)
     if args.zed:
         return ZedSource()
-    return ZedUvcSource(index)  # default, incl. explicit --zed-uvc
+    return ZedUvcSource(index, eye="right")  # default, incl. explicit --zed-uvc
 
 
 def run_cycle(source, classifier, table, rx, half_rad, args) -> None:

@@ -1,10 +1,10 @@
 # Emissivity Calculation
 
-Estimates the emissivity of the material seen by a camera. A frame is grabbed
-from a ZED 2i stereo camera (or an image file / webcam during development),
-the material is classified automatically with CLIP zero-shot image
-classification, and the emissivity is looked up in a table of tabulated values
-(`emissivity_table.csv`).
+Estimates the emissivity of the material(s) seen by a camera. A frame is
+grabbed from a ZED 2i stereo camera (or an image file / webcam during
+development), tiled into a grid of cells, each cell classified independently
+with CLIP zero-shot image classification, and its emissivity looked up in a
+table of tabulated values (`emissivity_table.csv`).
 
 No viewing-angle correction is applied here — tabulated normal emissivity only
 (surface geometry will be handled separately with lidar data).
@@ -65,7 +65,10 @@ python main.py --zed-uvc --camera-index 1 --show   # if it's not device 0
 # like the ZED 2i). Check the real node with `v4l2-ctl --list-devices` first.
 python main.py --zed-uvc --camera-index /dev/video1 --show
 
-# Restrict classification to a region: center-x, center-y, width, height (px)
+# Coarser or finer grid (default is 3x3)
+python main.py --image photo.jpg --grid-size 4
+
+# Restrict the grid to a region: center-x, center-y, width, height (px)
 python main.py --image photo.jpg --roi 320,240,200,200
 
 # Live mode: keep grabbing + classifying frames (model loaded once) until you
@@ -73,23 +76,23 @@ python main.py --image photo.jpg --roi 320,240,200,200
 python main.py --zed-uvc --show --live
 ```
 
-**Aiming box.** Camera sources (`--webcam`/`--zed`/`--zed-uvc`) classify a
-centered box — about half the frame's shorter side — instead of the whole
-frame, and `--show` draws it as a green rectangle: only what's inside it goes
-to CLIP, so you point the camera to put one material inside the box. `--image`
-is unchanged and still classifies the whole picture (a saved photo is already
-framed). Pass `--roi cx,cy,w,h` on any source to use an explicit region
-instead of the default box.
+**Grid classification.** Every source — `--image` included — has its frame
+tiled into an NxN grid (`--grid-size`, default 3) and each cell classified
+independently, so you get emissivity coverage across the whole view instead
+of just one spot. `--show` draws every cell's box and its best-match label
+(`material e=X.XX`) as an overlay. Pass `--roi cx,cy,w,h` to tile only an
+explicit sub-region instead of the whole frame.
 
-Output: top-3 material matches with confidence and their tabulated emissivity
-(value + range), e.g.
+Output: one row per grid cell with its best material match, confidence, and
+tabulated emissivity, plus the single highest-confidence cell overall, e.g.
 
 ```
-Material              Confidence  Emissivity  Range
+Row  Col  Material            Confidence  Emissivity
 ------------------------------------------------------------
-brick                 93.1%       0.93        0.90-0.96
+0    0    brick               91.2%       0.93
+0    1    brick               77.4%       0.93
 ...
-Best estimate: brick -> emissivity = 0.93 (Common red brick)
+Best estimate: brick (row 0, col 0) -> emissivity = 0.93 (91%)
 ```
 
 ## Adding materials
@@ -114,10 +117,11 @@ Two ways to read the camera, depending on hardware:
 **`--zed-uvc`** (works on this PC — no NVIDIA GPU here): the ZED 2i also
 shows up as a plain USB webcam. Over UVC its frame is the left+right stereo
 pair concatenated side by side (unrectified); `ZedUvcSource` just opens it
-with OpenCV like any webcam and crops the left half. No depth, no
-rectification — not needed here since only a color crop is fed to CLIP.
-Use `--camera-index` if it isn't device 0 (e.g. a laptop's built-in webcam
-is usually 0, so the ZED may enumerate as 1 or 2).
+with OpenCV like any webcam and crops the right half (matching the eye
+SensorFusion uses for CLIP classification). No depth, no rectification — not
+needed here since only a color crop is fed to CLIP. Use `--camera-index` if
+it isn't device 0 (e.g. a laptop's built-in webcam is usually 0, so the ZED
+may enumerate as 1 or 2).
 
 **`--zed`** (needs the official SDK): only worth it if you later need depth
 or rectified stereo. Requires:

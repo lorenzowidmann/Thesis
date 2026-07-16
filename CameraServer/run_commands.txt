@@ -2,8 +2,8 @@
  RUN COMMANDS - Camera-shared workflow (emissivity + drive view)
 =====================================================================
 
-Runs both eyes of the ZED at once: left eye for headless emissivity
-estimation, right eye for a live driving-view window. Windows locks a UVC
+Runs both eyes of the ZED at once: right eye for headless emissivity
+estimation, left eye for a live driving-view window. Windows locks a UVC
 device to whichever process opens it first, so this needs camera_server.py
 running FIRST, in its own terminal, before either client -- see
 CameraServer/README.md for why.
@@ -15,13 +15,13 @@ CameraServer/README.md for why.
 cd C:\Users\loren\desktop\measurment_v2\ClaudeCOde\Thesis\CameraServer
 C:\venvs\emissivity\Scripts\python.exe camera_server.py
 
-# 2. Emissivity estimation (left eye, headless, prints to terminal)
+# 2. Emissivity estimation (right eye, headless, prints to terminal)
 cd C:\Users\loren\desktop\measurment_v2\ClaudeCOde\Thesis\SensorFusion
 set HF_HUB_OFFLINE=1&& set TRANSFORMERS_OFFLINE=1&& C:\venvs\emissivity\Scripts\python.exe sensor_fusion.py --shared
 
-# 3. Drive view (right eye, live GUI window)
+# 3. Drive view (left eye, live GUI window)
 cd C:\Users\loren\desktop\measurment_v2\ClaudeCOde\Thesis\DriveView
-C:\venvs\emissivity\Scripts\python.exe drive_view.py --shared --eye right
+C:\venvs\emissivity\Scripts\python.exe drive_view.py --shared --eye left
 
 --- Notes ---
 # - Step 1 only needs to be started once per session; steps 2 and 3 can be
@@ -46,5 +46,5 @@ cd ~/Desktop/LorenzoWidmann/Code/Thesis/SensorFusion
 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python3 sensor_fusion.py --shared
 
 cd ~/Desktop/LorenzoWidmann/Code/Thesis/DriveView
-python3 drive_view.py --shared --eye right
+python3 drive_view.py --shared --eye left
 =====================================================================

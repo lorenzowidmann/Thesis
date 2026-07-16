@@ -7,7 +7,7 @@ first.** Tested empirically on the rover's ZED 2i (device index 0,
 index gets zero successful frame reads (MSMF) or fails to even open
 (DirectShow) while the first is active.
 
-The ZED's left eye (classification, `SensorFusion`) and right eye (driving
+The ZED's right eye (classification, `SensorFusion`) and left eye (driving
 view, `DriveView`) come from the **same physical stream**, so the fix isn't
 "open the camera twice" — it's one process owns the camera and republishes
 each frame for others to read.
@@ -39,7 +39,7 @@ cd ../SensorFusion
 C:\venvs\emissivity\Scripts\python.exe sensor_fusion.py --shared
 
 cd ../DriveView
-C:\venvs\emissivity\Scripts\python.exe drive_view.py --shared --eye right
+C:\venvs\emissivity\Scripts\python.exe drive_view.py --shared --eye left
 ```
 
 Verified: with the server running, two independent client processes reading

@@ -1,12 +1,11 @@
 """Estimate material emissivity from a camera image.
 
-Grabs a frame (image file, webcam, or ZED 2i), classifies the material with
-CLIP zero-shot, and prints the tabulated emissivity of the top matches.
-
-Camera sources (--webcam/--zed/--zed-uvc) classify a centered box, not the
-whole frame, and draw it as a green aiming rectangle in --show -- only what's
-inside it is fed to CLIP. --image still classifies the whole picture. --roi
-overrides the box (either way) with an explicit cx,cy,w,h region.
+Grabs a frame (image file, webcam, or ZED 2i), tiles it into a grid of cells,
+classifies the material in each cell with CLIP zero-shot, and prints the
+tabulated emissivity for every cell (not just the frame center). --show draws
+every cell's box + best-match label. --roi restricts the grid to an explicit
+cx,cy,w,h sub-region instead of the whole frame. --grid-size sets how many
+rows/cols the (whole frame or --roi) region is divided into.
 
 Usage:
     py main.py --image test_images/brick.jpg
@@ -15,6 +14,7 @@ Usage:
     py main.py --zed-uvc --show
     py main.py --zed-uvc --show --live   # keep classifying frames until you press 'q'
     py main.py --image photo.jpg --roi 320,240,200,200
+    py main.py --image photo.jpg --grid-size 4
 """
 
 import argparse
@@ -50,13 +50,14 @@ def parse_args():
     )
     p.add_argument(
         "--roi",
-        help="Crop region cx,cy,w,h (center + size in pixels) before classification. "
-        "For camera sources this defaults to a centered box (see "
-        "default_center_roi()) so --show draws a real aiming box, not just a "
-        "decorative marker -- only what's inside it is classified. --image "
-        "still defaults to the whole picture",
+        help="Restrict the grid to an explicit cx,cy,w,h (center + size in "
+        "pixels) sub-region instead of tiling the whole frame.",
     )
-    p.add_argument("--top-k", type=int, default=3, help="Number of matches to show")
+    p.add_argument(
+        "--grid-size", type=int, default=3, metavar="N",
+        help="Tile the classified region into an NxN grid (default 3) and "
+        "classify each cell independently instead of just the frame center.",
+    )
     p.add_argument("--show", action="store_true", help="Display frame with overlay")
     p.add_argument(
         "--live", action="store_true",
@@ -131,15 +132,62 @@ def classify_frame(frame, classifier, table, top_k):
     return best, results[0][1]
 
 
-def draw_overlay(frame, best, confidence, roi=None):
+def grid_boxes(width: int, height: int, rows: int, cols: int) -> list[tuple[int, int, int, int]]:
+    """Tile a width x height region into rows*cols cells, each (x0, y0, x1, y1)
+    in that region's local coordinates, row-major order."""
+    xs = [round(c * width / cols) for c in range(cols + 1)]
+    ys = [round(r * height / rows) for r in range(rows + 1)]
+    return [
+        (xs[c], ys[r], xs[c + 1], ys[r + 1])
+        for r in range(rows)
+        for c in range(cols)
+    ]
+
+
+def classify_grid(frame, classifier, table, rows, cols, roi=None):
+    """Classify every cell of a rows x cols grid tiling `frame` (or the
+    sub-region given by `roi`, a cx,cy,w,h string, if provided). Prints a
+    compact grid table and returns a list of
+    (row, col, x0, y0, x1, y1, EmissivityRecord, confidence) in absolute frame
+    coordinates."""
+    if roi:
+        base_x0, base_y0, base_x1, base_y1 = roi_bounds(frame, roi)
+    else:
+        base_x0, base_y0 = 0, 0
+        base_y1, base_x1 = frame.shape[:2]
+
+    cells = []
+    print(f"\n{'Row':<5}{'Col':<5}{'Material':<20}{'Confidence':<12}Emissivity")
+    print("-" * 60)
+    boxes = grid_boxes(base_x1 - base_x0, base_y1 - base_y0, rows, cols)
+    for i, (x0, y0, x1, y1) in enumerate(boxes):
+        r, c = divmod(i, cols)
+        abs_x0, abs_y0 = base_x0 + x0, base_y0 + y0
+        abs_x1, abs_y1 = base_x0 + x1, base_y0 + y1
+        crop = frame[abs_y0:abs_y1, abs_x0:abs_x1]
+        material, confidence = classifier.classify(crop, top_k=1)[0]
+        rec = table.lookup(material)
+        print(f"{r:<5}{c:<5}{material:<20}{confidence:<12.1%}{rec.emissivity:.2f}")
+        cells.append((r, c, abs_x0, abs_y0, abs_x1, abs_y1, rec, confidence))
+
+    best_r, best_c, *_, best_rec, best_conf = max(cells, key=lambda cell: cell[7])
+    print(
+        f"\nBest estimate: {best_rec.material} (row {best_r}, col {best_c}) "
+        f"-> emissivity = {best_rec.emissivity} ({best_conf:.0%})"
+    )
+    return cells
+
+
+def draw_grid_overlay(frame, cells):
     import cv2
 
     bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-    if roi:
-        x0, y0, x1, y1 = roi_bounds(frame, roi)
-        cv2.rectangle(bgr, (x0, y0), (x1, y1), (0, 255, 0), 2)
-    label = f"{best.material}: e={best.emissivity} ({confidence:.0%})"
-    cv2.putText(bgr, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+    for _r, _c, x0, y0, x1, y1, rec, _confidence in cells:
+        cv2.rectangle(bgr, (x0, y0), (x1, y1), (0, 255, 0), 1)
+        label = f"{rec.material[:12]} e={rec.emissivity:.2f}"
+        cv2.putText(
+            bgr, label, (x0 + 4, y0 + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1
+        )
     return bgr
 
 
@@ -163,13 +211,11 @@ def main():
     elif args.webcam:
         source = WebcamSource(camera_index)
     elif args.zed_uvc:
-        source = ZedUvcSource(camera_index)
+        source = ZedUvcSource(camera_index, eye="right")
     else:
         source = ZedSource()
 
-    is_camera = not args.image
-    roi = args.roi  # camera sources fall back to a default center box, once the
-                     # first frame's size is known -- see default_center_roi()
+    rows = cols = args.grid_size
 
     with source:
         if args.live:
@@ -177,18 +223,15 @@ def main():
 
             classify_every = max(1, args.classify_every)
             print("Live mode -- press 'q' in the image window to stop.")
-            best = confidence = None
+            cells = None
             frame_count = 0
             try:
                 while True:
                     frame = source.grab()
-                    if roi is None and is_camera:
-                        roi = default_center_roi(frame)
-                    crop = crop_roi(frame, roi) if roi else frame
-                    if best is None or frame_count % classify_every == 0:
-                        best, confidence = classify_frame(crop, classifier, table, args.top_k)
+                    if cells is None or frame_count % classify_every == 0:
+                        cells = classify_grid(frame, classifier, table, rows, cols, args.roi)
                     frame_count += 1
-                    cv2.imshow("Emissivity estimation", draw_overlay(frame, best, confidence, roi))
+                    cv2.imshow("Emissivity estimation", draw_grid_overlay(frame, cells))
                     if cv2.waitKey(1) & 0xFF == ord("q"):
                         break
             except KeyboardInterrupt:
@@ -198,16 +241,12 @@ def main():
             return 0
 
         frame = source.grab()
-        if roi is None and is_camera:
-            roi = default_center_roi(frame)
-        crop = crop_roi(frame, roi) if roi else frame
-
-        best, confidence = classify_frame(crop, classifier, table, args.top_k)
+        cells = classify_grid(frame, classifier, table, rows, cols, args.roi)
 
         if args.show:
             import cv2
 
-            cv2.imshow("Emissivity estimation", draw_overlay(frame, best, confidence, roi))
+            cv2.imshow("Emissivity estimation", draw_grid_overlay(frame, cells))
             print("Press any key in the image window to close.")
             cv2.waitKey(0)
             cv2.destroyAllWindows()

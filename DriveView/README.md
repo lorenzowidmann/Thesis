@@ -1,8 +1,8 @@
 # DriveView
 
-Live view from the ZED 2i's **second lens**, for driving the rover — a plain
+Live view from the ZED 2i's **first lens**, for driving the rover — a plain
 `cv2.imshow` window, no CLIP, no LiDAR, no GPU load. Meant to run alongside
-the headless `SensorFusion/sensor_fusion.py`, which uses the *left* eye for
+the headless `SensorFusion/sensor_fusion.py`, which uses the *right* eye for
 classification and doesn't open a window.
 
 `EmissivityCalculation`'s `ZedUvcSource` cropped only the left half of the
@@ -21,8 +21,8 @@ stream. See `../CameraServer/README.md`.
 
 ```bash
 cd Thesis/DriveView
-C:\venvs\emissivity\Scripts\python.exe drive_view.py                  # ZED UVC, right eye (default)
-C:\venvs\emissivity\Scripts\python.exe drive_view.py --eye left       # left eye instead
+C:\venvs\emissivity\Scripts\python.exe drive_view.py                  # ZED UVC, left eye (default)
+C:\venvs\emissivity\Scripts\python.exe drive_view.py --eye right      # right eye instead
 C:\venvs\emissivity\Scripts\python.exe drive_view.py --camera-index 1 # if the ZED isn't device 0
 C:\venvs\emissivity\Scripts\python.exe drive_view.py --webcam         # plain webcam, for dev without a ZED
 C:\venvs\emissivity\Scripts\python.exe drive_view.py --shared         # read from a running
@@ -38,12 +38,12 @@ Press `q` in the window or Ctrl+C to stop.
 |------|---------|---------|
 | `--webcam` / `--shared` | off | `--webcam`: plain webcam instead of the ZED; `--shared`: read from a running `CameraServer/camera_server.py` instead of opening the camera directly |
 | `--camera-index` | `0` | Device index/path (ignored with `--shared`) |
-| `--eye` | `right` | Which ZED lens to show (`left` matches SensorFusion's classified crop) |
+| `--eye` | `left` | Which ZED lens to show (`right` matches SensorFusion's classified crop) |
 
 ## Structure
 
 ```
 DriveView/
-├── drive_view.py   # live cv2 window, right (or left) eye, no CLIP/LiDAR
+├── drive_view.py   # live cv2 window, left (or right) eye, no CLIP/LiDAR
 └── README.md
 ```

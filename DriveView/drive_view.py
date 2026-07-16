@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""Live driving view from the ZED 2i's second lens.
+"""Live driving view from the ZED 2i's first lens.
 
-The ZED 2i's left eye is used for material classification in
+The ZED 2i's right eye is used for material classification in
 EmissivityCalculation (now run headless via SensorFusion, no window). This
-just shows the *right* eye live in a plain cv2 window so you can see where
+just shows the *left* eye live in a plain cv2 window so you can see where
 the rover is going -- a separate, cheap raw video feed with no CLIP/GPU load,
 so it can run alongside the headless SensorFusion process.
 
 Windows locks a UVC device to whichever process opens it first, so this can't
 run at the same time as another script that opens the camera directly (e.g.
 SensorFusion with --zed-uvc). Use --shared instead, with CameraServer/
-camera_server.py running, to view the right eye while SensorFusion classifies
-the left eye from the same physical camera.
+camera_server.py running, to view the left eye while SensorFusion classifies
+the right eye from the same physical camera.
 
 Usage:
-    py drive_view.py                  # ZED UVC, right eye (default)
-    py drive_view.py --eye left       # left eye instead
+    py drive_view.py                  # ZED UVC, left eye (default)
+    py drive_view.py --eye right      # right eye instead
     py drive_view.py --camera-index 1 # if the ZED isn't device 0
     py drive_view.py --webcam         # plain webcam, for dev without a ZED
     py drive_view.py --shared         # read from a running camera_server.py instead
@@ -59,8 +59,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                            "opening the camera directly")
     p.add_argument("--camera-index", default="0", metavar="N",
                     help="Device index/path (default 0)")
-    p.add_argument("--eye", choices=["left", "right"], default="right",
-                    help="Which ZED lens to show (default: right, the second lens)")
+    p.add_argument("--eye", choices=["left", "right"], default="left",
+                    help="Which ZED lens to show (default: left, the first lens)")
     return p.parse_args(argv)
 
 
