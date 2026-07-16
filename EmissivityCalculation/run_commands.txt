@@ -19,4 +19,13 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python3 main.py --zed-uvc --camera-index
 # model and skip the HuggingFace hub freshness check (avoids slow 504 retry
 # loop when the hub is unreachable). Drop the prefix to allow checking for
 # model updates again.
+
+# --- FIRST RUN with the new default model (openai/clip-vit-large-patch14) ---
+# Needs network access to download it once (~1.7 GB). Do NOT set
+# HF_HUB_OFFLINE/TRANSFORMERS_OFFLINE for this one run:
+python3 main.py --zed-uvc --camera-index 0 --show --live
+# After that it's cached and the normal offline command above works.
+
+# The original smaller/faster model is still cached and usable via --clip-model:
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python3 main.py --zed-uvc --camera-index 0 --show --live --clip-model openai/clip-vit-base-patch32
 =====================================================================

@@ -73,6 +73,14 @@ def parse_args():
         "classify every frame",
     )
     p.add_argument("--table", default=None, help="Path to a custom emissivity CSV")
+    p.add_argument(
+        "--clip-model", default="openai/clip-vit-large-patch14",
+        help="HF CLIP model to use (default: openai/clip-vit-large-patch14, "
+        "more accurate than the original openai/clip-vit-base-patch32). Each "
+        "model is cached separately -- switching does not evict the other's "
+        "cache. First use of a new model needs network access to download it "
+        "(unset HF_HUB_OFFLINE/TRANSFORMERS_OFFLINE for that one run).",
+    )
     return p.parse_args()
 
 
@@ -146,7 +154,7 @@ def main():
         return 2
 
     table = EmissivityTable(args.table) if args.table else EmissivityTable()
-    classifier = MaterialClassifier(table)
+    classifier = MaterialClassifier(table, model_name=args.clip_model)
 
     camera_index = parse_camera_index(args.camera_index)
 
