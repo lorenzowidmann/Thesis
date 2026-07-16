@@ -1,0 +1,45 @@
+=====================================================================
+ RUN COMMANDS - Camera-shared workflow (emissivity + drive view)
+=====================================================================
+
+Runs both eyes of the ZED at once: left eye for headless emissivity
+estimation, right eye for a live driving-view window. Windows locks a UVC
+device to whichever process opens it first, so this needs camera_server.py
+running FIRST, in its own terminal, before either client -- see
+CameraServer/README.md for why.
+
+--- WINDOWS, 3 separate terminals, in this order ---
+
+# 1. Camera server (start once, leave running -- do NOT restart between uses)
+cd C:\Users\loren\desktop\measurment_v2\ClaudeCOde\Thesis\CameraServer
+C:\venvs\emissivity\Scripts\python.exe camera_server.py
+
+# 2. Emissivity estimation (left eye, headless, prints to terminal)
+cd C:\Users\loren\desktop\measurment_v2\ClaudeCOde\Thesis\SensorFusion
+set HF_HUB_OFFLINE=1&& set TRANSFORMERS_OFFLINE=1&& C:\venvs\emissivity\Scripts\python.exe sensor_fusion.py --shared
+
+# 3. Drive view (right eye, live GUI window)
+cd C:\Users\loren\desktop\measurment_v2\ClaudeCOde\Thesis\DriveView
+C:\venvs\emissivity\Scripts\python.exe drive_view.py --shared --eye right
+
+--- Notes ---
+# - Step 1 only needs to be started once per session; steps 2 and 3 can be
+#   started/stopped independently, in either order, any number of times,
+#   as long as the server from step 1 is still running.
+# - If a --shared client can't find the server, it errors out after ~5s
+#   (--timeout to change that wait).
+# - Ctrl-C stops any of the three processes individually.
+# - Emissivity output is TEXT in step 2's terminal (the classification table
+#   + a "[fusion] emissivity=... distance=..." summary line), not in the
+#   step 3 GUI window -- that window is video-only, no text overlay.
+
+--- LINUX / UBUNTU (paths only differ; same 3-terminal order) ---
+cd ~/Desktop/LorenzoWidmann/Code/Thesis/CameraServer
+python3 camera_server.py
+
+cd ~/Desktop/LorenzoWidmann/Code/Thesis/SensorFusion
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python3 sensor_fusion.py --shared
+
+cd ~/Desktop/LorenzoWidmann/Code/Thesis/DriveView
+python3 drive_view.py --shared --eye right
+=====================================================================

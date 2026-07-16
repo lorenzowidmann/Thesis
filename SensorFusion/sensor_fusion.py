@@ -13,6 +13,11 @@ Usage:
     py sensor_fusion.py --once                # single measurement
     py sensor_fusion.py --image photo.jpg --once
     py sensor_fusion.py --precision accurate  # heavier CLIP model
+    py sensor_fusion.py --shared              # read the left eye from a running
+                                               # CameraServer/camera_server.py instead
+                                               # of opening the camera directly -- use
+                                               # this to run alongside DriveView (Windows
+                                               # only lets one process own a UVC device)
 """
 
 from __future__ import annotations
@@ -26,14 +31,16 @@ from pathlib import Path
 _THESIS_DIR = Path(__file__).resolve().parent.parent
 _EMISSIVITY_DIR = _THESIS_DIR / "EmissivityCalculation"
 _LIDAR_DIR = _THESIS_DIR / "LidarDistance"
+_CAMERASERVER_DIR = _THESIS_DIR / "CameraServer"
 
-# Both sibling modules are plain directories (not installed packages), and
-# both happen to have their own main.py, so they're loaded under distinct
-# module names via importlib instead of a bare `import main` that would
-# collide. Their packages ("emissivity", "livox") don't collide and are
-# added to sys.path normally.
+# Sibling modules are plain directories (not installed packages), and
+# EmissivityCalculation/LidarDistance both happen to have their own main.py,
+# so they're loaded under distinct module names via importlib instead of a
+# bare `import main` that would collide. Their packages ("emissivity",
+# "livox") don't collide and are added to sys.path normally.
 sys.path.insert(0, str(_EMISSIVITY_DIR))
 sys.path.insert(0, str(_LIDAR_DIR))
+sys.path.insert(0, str(_CAMERASERVER_DIR))
 
 
 def _load_module(name: str, path: Path):
@@ -50,6 +57,7 @@ lidar_main = _load_module("_sensorfusion_lidar_main", _LIDAR_DIR / "main.py")
 from emissivity import EmissivityTable, MaterialClassifier  # noqa: E402
 from emissivity.sources import ImageSource, WebcamSource, ZedSource, ZedUvcSource  # noqa: E402
 from livox import DEFAULT_DATA_PORT, LivoxReceiver  # noqa: E402
+from shared_frame import SharedZedSource  # noqa: E402
 
 PRECISION_MODELS = {
     "fast": "openai/clip-vit-base-patch32",       # lighter, default -- weak-GPU rover PC
@@ -74,6 +82,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     src_group.add_argument(
         "--zed-uvc", action="store_true",
         help="ZED 2i as a plain UVC webcam (OpenCV only, no SDK/GPU -- default)",
+    )
+    src_group.add_argument(
+        "--shared", action="store_true",
+        help="Read the left eye from a running CameraServer/camera_server.py instead of "
+             "opening the camera directly -- use this to run alongside DriveView, since "
+             "Windows only lets one process own a UVC device at a time",
     )
     src.add_argument("--camera-index", default="0", metavar="N",
                       help="Device index/path for --webcam / --zed-uvc (default 0)")
@@ -113,6 +127,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def make_camera_source(args: argparse.Namespace):
     if args.image:
         return ImageSource(args.image)
+    if args.shared:
+        return SharedZedSource(eye="left")
     index = emissivity_main.parse_camera_index(args.camera_index)
     if args.webcam:
         return WebcamSource(index)

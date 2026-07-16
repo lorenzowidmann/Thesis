@@ -110,6 +110,19 @@ argument so this reuses the same capture code instead of duplicating it.
 
 Output: a live video window for teleoperation.
 
+### 6. `CameraServer/` — shared access to one physical camera
+
+Both eyes come from the **same** ZED UVC stream, and Windows locks a UVC
+device to whichever process opens it first (verified empirically: a second
+`cv2.VideoCapture` on the same index gets zero frames). `camera_server.py`
+owns the camera once and republishes every frame over
+`multiprocessing.shared_memory` (seqlock-protected); `SensorFusion` and
+`DriveView` pass `--shared` to read from it instead of opening the device
+directly, so both can run at the same time.
+
+Output: no user-facing output — infrastructure so modules 4 and 5 can share
+one camera concurrently.
+
 ## How the modules connect
 
 Modules 1–2 form the temperature-correction chain; module 3 is a separate,

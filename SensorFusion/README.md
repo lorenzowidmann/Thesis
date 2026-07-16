@@ -36,6 +36,18 @@ C:\venvs\emissivity\Scripts\python.exe sensor_fusion.py --image photo.jpg --once
 C:\venvs\emissivity\Scripts\python.exe sensor_fusion.py --precision accurate  # heavier CLIP model
 ```
 
+**Running alongside `DriveView`?** Windows locks the ZED's UVC device to
+whichever process opens it first, so `sensor_fusion.py --zed-uvc` and
+`drive_view.py` can't both open it directly at the same time. Start
+`CameraServer/camera_server.py` once, then pass `--shared` to read the left
+eye from it instead:
+
+```bash
+C:\venvs\emissivity\Scripts\python.exe sensor_fusion.py --shared
+```
+
+See `../CameraServer/README.md`.
+
 Output per cycle:
 
 ```
@@ -52,7 +64,7 @@ LiDAR distance[m]  median=2.431  mean=2.438  min=2.402  max=2.489  std=0.021  (n
 
 | Flag | Default | Meaning |
 |------|---------|---------|
-| `--image` / `--webcam` / `--zed` / `--zed-uvc` | `--zed-uvc` | Camera source (default needs no ZED SDK/GPU) |
+| `--image` / `--webcam` / `--zed` / `--zed-uvc` / `--shared` | `--zed-uvc` | Camera source (default needs no ZED SDK/GPU; `--shared` reads the left eye from a running `CameraServer/camera_server.py`) |
 | `--camera-index` | `0` | Device index/path for `--webcam` / `--zed-uvc` |
 | `--roi` | — | Explicit crop `cx,cy,w,h`, overrides the default central square |
 | `--fraction` | `0.5` | Central square size, shared between the camera ROI and the LiDAR angular square (same patch on both sensors) |
@@ -102,7 +114,7 @@ solve — paired 3D points (LiDAR + stereo depth) via Kabsch/SVD, or 2D image
 points + known 3D target geometry via `cv2.solvePnP`.
 
 Shares `sensor_fusion.py`'s camera/LiDAR flags (`--image`/`--webcam`/`--zed`/
-`--zed-uvc`, `--camera-index`, `--host-ip`/`--data-port`/`--timeout`,
+`--zed-uvc`/`--shared`, `--camera-index`, `--host-ip`/`--data-port`/`--timeout`,
 `--duration`).
 
 ## Setup
