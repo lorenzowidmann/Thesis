@@ -99,6 +99,17 @@ duplicating them.
 Output: terminal-printed emissivity + distance per cycle; later, the LiDAR →
 camera extrinsic transform.
 
+### 5. `DriveView/` — live view from the ZED 2i's second lens
+
+Module 1 / `SensorFusion` classify the ZED's **left** eye headlessly (no
+window). `DriveView/drive_view.py` shows the **right** eye live in a plain
+`cv2` window — no CLIP, no LiDAR, negligible GPU load — so the rover can be
+driven visually while `SensorFusion` runs headless alongside it.
+`EmissivityCalculation`'s `ZedUvcSource` now takes an `eye="left"|"right"`
+argument so this reuses the same capture code instead of duplicating it.
+
+Output: a live video window for teleoperation.
+
 ## How the modules connect
 
 Modules 1–2 form the temperature-correction chain; module 3 is a separate,

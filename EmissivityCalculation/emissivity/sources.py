@@ -68,18 +68,24 @@ class WebcamSource(FrameSource):
 
 
 class ZedUvcSource(FrameSource):
-    """ZED 2i left-eye RGB frames via plain UVC (OpenCV), no ZED SDK/GPU needed.
+    """ZED 2i single-eye RGB frames via plain UVC (OpenCV), no ZED SDK/GPU needed.
 
     Over USB the ZED 2i exposes itself as one wide webcam whose frame is the
     left+right stereo pair concatenated side by side (unrectified). This just
-    opens it like any other webcam and crops the left half -- no depth, no
-    rectification, but that's not needed for a color crop fed to CLIP.
+    opens it like any other webcam and crops one half -- no depth, no
+    rectification. `eye="left"` (default) is what CLIP classification uses;
+    `eye="right"` is the second lens, e.g. for a separate driving-view feed
+    that doesn't need to match the classified crop.
     """
 
-    def __init__(self, index: int | str = 0):
+    def __init__(self, index: int | str = 0, eye: str = "left"):
         import cv2
 
+        if eye not in ("left", "right"):
+            raise ValueError(f"eye must be 'left' or 'right', got {eye!r}")
+
         self._cv2 = cv2
+        self.eye = eye
         self.cap = _open_capture(cv2, index)
         if not self.cap.isOpened():
             raise RuntimeError(f"Could not open ZED camera (UVC) at index {index}")
@@ -89,8 +95,8 @@ class ZedUvcSource(FrameSource):
         if not ok:
             raise RuntimeError("Failed to grab frame from ZED camera (UVC)")
         rgb = self._cv2.cvtColor(frame_bgr, self._cv2.COLOR_BGR2RGB)
-        left, _right = np.split(rgb, 2, axis=1)
-        return left
+        left, right = np.split(rgb, 2, axis=1)
+        return left if self.eye == "left" else right
 
     def close(self) -> None:
         self.cap.release()
