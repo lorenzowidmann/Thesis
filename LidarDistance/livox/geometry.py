@@ -27,6 +27,8 @@ class DistanceStats:
     n_valid: int = 0        # points with x > 0 (real returns, sensor invalid-point convention)
     n_in_square: int = 0    # of those, points inside the angular square (any range)
     nearest_in_square: float = 0.0  # closest range among n_in_square, 0.0 if none
+    min_abs_azimuth_deg: float = 0.0    # smallest |azimuth| among valid points (n_valid>0 only)
+    min_abs_elevation_deg: float = 0.0  # smallest |elevation| among valid points
 
     def format(self) -> str:
         if self.n == 0:
@@ -36,8 +38,10 @@ class DistanceStats:
             if self.n_in_square == 0:
                 return (f"no returns in central square (received {self.n_total} pts, "
                         f"{self.n_valid} valid, none inside the angular square -- "
-                        f"aim is off the target, or target smaller than the square's "
-                        f"footprint at this range)")
+                        f"nearest valid return is {self.min_abs_azimuth_deg:.1f} deg azimuth / "
+                        f"{self.min_abs_elevation_deg:.1f} deg elevation off-axis -- widen "
+                        f"--square-deg to include it, or this may be a boresight blind cone "
+                        f"at this range)")
             return (f"no returns in central square (received {self.n_total} pts, "
                     f"{self.n_in_square} inside the square but outside the "
                     f"[min,max] range gate -- nearest in-square point at "
@@ -67,12 +71,23 @@ def compute_stats(xyz: np.ndarray, half_angle_rad: float,
     sel = rng[mask]
     if sel.size == 0:
         square_mask = central_square_mask(xyz, half_angle_rad)
-        n_valid = int((xyz[:, 0] > 0).sum())
+        valid_mask = xyz[:, 0] > 0
+        n_valid = int(valid_mask.sum())
         n_in_square = int(square_mask.sum())
         nearest = float(rng[square_mask].min()) if n_in_square else 0.0
+        min_az_deg = min_el_deg = 0.0
+        if n_valid and not n_in_square:
+            vx, vy, vz = xyz[valid_mask, 0], xyz[valid_mask, 1], xyz[valid_mask, 2]
+            horiz = np.hypot(vx, vy)
+            azimuth = np.arctan2(vy, vx)
+            elevation = np.arctan2(vz, horiz)
+            min_az_deg = float(np.degrees(np.abs(azimuth).min()))
+            min_el_deg = float(np.degrees(np.abs(elevation).min()))
         return DistanceStats(0, n_total, 0.0, 0.0, 0.0, 0.0, 0.0,
                              n_valid=n_valid, n_in_square=n_in_square,
-                             nearest_in_square=nearest)
+                             nearest_in_square=nearest,
+                             min_abs_azimuth_deg=min_az_deg,
+                             min_abs_elevation_deg=min_el_deg)
     return DistanceStats(
         n=int(sel.size), n_total=n_total,
         min=float(sel.min()), max=float(sel.max()),
