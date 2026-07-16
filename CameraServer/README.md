@@ -55,6 +55,19 @@ segment itself (no manual cleanup needed).
 See `run_commands.txt` for the full 3-terminal copy-paste sequence (server,
 then emissivity, then drive view).
 
+## Auto-close when idle
+
+The server also self-closes if **neither eye** has been read for
+`--idle-timeout` seconds (default 30) — you don't need to remember to Ctrl-C
+it once `sensor_fusion.py --shared` and `drive_view.py --shared` have both
+exited. Attaching or reading counts as activity from either script, so the
+timer only starts once both are gone. `--idle-timeout 0` disables this and
+runs until Ctrl-C (the old behavior).
+
+Verified: with `--idle-timeout 5`, a client reading continuously for 6s kept
+the server alive past the 5s mark, then the server closed ~5s after that
+client disconnected; with no client at all it closed after exactly 5s.
+
 ## When you don't need this
 
 If only one script uses the camera at a time (e.g. just `drive_view.py`, or

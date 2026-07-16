@@ -8,9 +8,16 @@ drive_view.py / extrinsic_calibration.py at it with --shared instead of
 having them open the camera directly -- lets both the headless emissivity
 pipeline and the live drive view read the ZED at the same time.
 
+Also self-closes when idle: if neither eye has been read (attached or
+read() called) for --idle-timeout seconds, the server shuts itself down and
+releases the camera instead of holding it forever after both
+sensor_fusion.py and drive_view.py have exited.
+
 Usage:
     py camera_server.py                  # ZED / webcam at index 0
     py camera_server.py --camera-index 1
+    py camera_server.py --idle-timeout 60  # wait longer before self-closing
+    py camera_server.py --idle-timeout 0   # never self-close (old behavior)
 """
 
 from __future__ import annotations
@@ -45,6 +52,9 @@ from shared_frame import FrameWriter  # noqa: E402
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--camera-index", default="0", metavar="N", help="Device index/path (default 0)")
+    p.add_argument("--idle-timeout", type=float, default=30.0, metavar="SEC",
+                    help="Self-close after this many seconds with no reader activity on "
+                         "either eye (default 30; 0 disables self-close, runs until Ctrl-C)")
     return p.parse_args(argv)
 
 
@@ -57,9 +67,16 @@ def main(argv: list[str] | None = None) -> int:
         writer = FrameWriter(frame.shape)
         print(f"Publishing {frame.shape[1]}x{frame.shape[0]} frames "
               f"(shared memory '{writer.header_shm.name}' / '{writer.data_shm.name}'). Ctrl-C to stop.")
+        if args.idle_timeout > 0:
+            print(f"Self-closing after {args.idle_timeout:.0f}s with no reader activity "
+                  f"on either eye (--idle-timeout 0 to disable).")
         try:
             while True:
                 writer.publish(source.grab())
+                if args.idle_timeout > 0 and writer.idle_seconds() > args.idle_timeout:
+                    print(f"No reader activity for {args.idle_timeout:.0f}s -- "
+                          f"neither eye is in use, closing.")
+                    break
         except KeyboardInterrupt:
             pass
         finally:

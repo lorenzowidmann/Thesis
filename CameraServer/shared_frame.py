@@ -9,6 +9,10 @@ opening the device itself.
 
 The seqlock (odd seq = write in progress, even = stable) avoids readers ever
 seeing a torn frame without needing a real cross-process mutex.
+
+Readers also stamp a shared heartbeat on attach and on every read(), so
+camera_server.py can tell when neither eye is actually being consumed and
+shut itself down -- see FrameWriter.idle_seconds() / --idle-timeout.
 """
 
 from __future__ import annotations
@@ -20,7 +24,7 @@ import numpy as np
 
 HEADER_NAME = "sensorfusion_zed_header"
 DATA_NAME = "sensorfusion_zed_data"
-HEADER_DTYPE = np.int64  # [seq, height, width]
+HEADER_DTYPE = np.int64  # [seq, height, width, last_activity_ms]
 
 
 def _cleanup_stale(name: str) -> None:
@@ -33,6 +37,10 @@ def _cleanup_stale(name: str) -> None:
         pass
 
 
+def _now_ms() -> int:
+    return int(time.monotonic() * 1000)
+
+
 class FrameWriter:
     """Server side: owns the shared memory, publishes one frame at a time."""
 
@@ -43,10 +51,12 @@ class FrameWriter:
 
         _cleanup_stale(HEADER_NAME)
         _cleanup_stale(DATA_NAME)
-        self.header_shm = shared_memory.SharedMemory(name=HEADER_NAME, create=True, size=3 * 8)
+        self.header_shm = shared_memory.SharedMemory(name=HEADER_NAME, create=True, size=4 * 8)
         self.data_shm = shared_memory.SharedMemory(name=DATA_NAME, create=True, size=h * w * c)
-        self.header = np.ndarray((3,), dtype=HEADER_DTYPE, buffer=self.header_shm.buf)
-        self.header[:] = (0, h, w)
+        self.header = np.ndarray((4,), dtype=HEADER_DTYPE, buffer=self.header_shm.buf)
+        # last_activity starts at "now" so a fresh server gets one full
+        # idle-timeout grace period even if no client ever attaches.
+        self.header[:] = (0, h, w, _now_ms())
         self.shape = shape
         self._data = np.ndarray(shape, dtype=np.uint8, buffer=self.data_shm.buf)
 
@@ -57,6 +67,11 @@ class FrameWriter:
         self.header[0] = seq + 1  # odd: write in progress
         self._data[:] = frame
         self.header[0] = seq + 2  # even: stable, new frame ready
+
+    def idle_seconds(self) -> float:
+        """Seconds since any reader last attached or called read() -- i.e.
+        since either eye was last actually consumed."""
+        return (_now_ms() - int(self.header[3])) / 1000.0
 
     def close(self) -> None:
         self.header_shm.close()
@@ -83,10 +98,11 @@ class FrameReader:
                     ) from None
                 time.sleep(0.1)
 
-        self.header = np.ndarray((3,), dtype=HEADER_DTYPE, buffer=self.header_shm.buf)
-        _, h, w = (int(x) for x in self.header)
+        self.header = np.ndarray((4,), dtype=HEADER_DTYPE, buffer=self.header_shm.buf)
+        _, h, w, _ = (int(x) for x in self.header)
         self.shape = (h, w, 3)
         self._data = np.ndarray(self.shape, dtype=np.uint8, buffer=self.data_shm.buf)
+        self.header[3] = _now_ms()  # attaching counts as activity too
 
     def read(self) -> np.ndarray:
         """Return the latest published frame, retrying on a torn read."""
@@ -98,6 +114,7 @@ class FrameReader:
             frame = self._data.copy()
             s2 = int(self.header[0])
             if s1 == s2:
+                self.header[3] = _now_ms()
                 return frame
 
     def close(self) -> None:
