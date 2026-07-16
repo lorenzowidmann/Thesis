@@ -1,0 +1,4 @@
+# ExtrinsicCalibration only — do not merge into OcTree's requirements.
+numpy
+opencv-python
+scipy
