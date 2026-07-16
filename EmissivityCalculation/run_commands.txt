@@ -4,14 +4,19 @@
 
 --- WINDOWS ---
 cd C:\Users\loren\desktop\measurment_v2\ClaudeCOde\Thesis\EmissivityCalculation
-C:\venvs\emissivity\Scripts\python.exe main.py --zed-uvc --show --live
+set HF_HUB_OFFLINE=1&& set TRANSFORMERS_OFFLINE=1&& C:\venvs\emissivity\Scripts\python.exe main.py --zed-uvc --show --live
 
 
 --- LINUX / UBUNTU ---
 cd ~/Desktop/LorenzoWidmann/Code/Thesis/EmissivityCalculation
 source .venv/bin/activate
-python3 main.py --zed-uvc --camera-index 0 --show --live
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python3 main.py --zed-uvc --camera-index 0 --show --live
 
 # if index 0 does not work, try index 1:
-python3 main.py --zed-uvc --camera-index 1 --show --live
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python3 main.py --zed-uvc --camera-index 1 --show --live
+
+# NOTE: HF_HUB_OFFLINE/TRANSFORMERS_OFFLINE force use of the cached CLIP
+# model and skip the HuggingFace hub freshness check (avoids slow 504 retry
+# loop when the hub is unreachable). Drop the prefix to allow checking for
+# model updates again.
 =====================================================================
