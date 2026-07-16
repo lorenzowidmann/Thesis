@@ -23,10 +23,25 @@ class DistanceStats:
     mean: float
     median: float   # robust distance estimate used for calibration
     std: float
+    # Diagnostics for the n==0 case only (see diagnose_empty below).
+    n_valid: int = 0        # points with x > 0 (real returns, sensor invalid-point convention)
+    n_in_square: int = 0    # of those, points inside the angular square (any range)
+    nearest_in_square: float = 0.0  # closest range among n_in_square, 0.0 if none
 
     def format(self) -> str:
         if self.n == 0:
-            return f"no returns in central square (received {self.n_total} pts)"
+            if self.n_valid == 0:
+                return (f"no returns in central square (received {self.n_total} pts, "
+                        f"all invalid/zero -- likely sensor blind zone at this range)")
+            if self.n_in_square == 0:
+                return (f"no returns in central square (received {self.n_total} pts, "
+                        f"{self.n_valid} valid, none inside the angular square -- "
+                        f"aim is off the target, or target smaller than the square's "
+                        f"footprint at this range)")
+            return (f"no returns in central square (received {self.n_total} pts, "
+                    f"{self.n_in_square} inside the square but outside the "
+                    f"[min,max] range gate -- nearest in-square point at "
+                    f"{self.nearest_in_square:.3f} m)")
         return (f"distance[m]  median={self.median:.3f}  mean={self.mean:.3f}  "
                 f"min={self.min:.3f}  max={self.max:.3f}  std={self.std:.3f}  "
                 f"(n={self.n}/{self.n_total})")
@@ -51,7 +66,13 @@ def compute_stats(xyz: np.ndarray, half_angle_rad: float,
     mask &= (rng >= min_range) & (rng <= max_range)
     sel = rng[mask]
     if sel.size == 0:
-        return DistanceStats(0, n_total, 0.0, 0.0, 0.0, 0.0, 0.0)
+        square_mask = central_square_mask(xyz, half_angle_rad)
+        n_valid = int((xyz[:, 0] > 0).sum())
+        n_in_square = int(square_mask.sum())
+        nearest = float(rng[square_mask].min()) if n_in_square else 0.0
+        return DistanceStats(0, n_total, 0.0, 0.0, 0.0, 0.0, 0.0,
+                             n_valid=n_valid, n_in_square=n_in_square,
+                             nearest_in_square=nearest)
     return DistanceStats(
         n=int(sel.size), n_total=n_total,
         min=float(sel.min()), max=float(sel.max()),
