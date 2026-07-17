@@ -1,0 +1,55 @@
+=====================================================================
+ UBUNTU RUN COMMANDS - camera server + drive view + grid emissivity
+=====================================================================
+3 separate terminals, in this order. The server owns the ZED; the
+other two attach to it with --shared and can be started/stopped
+independently while the server is running.
+
+
+---------------------------------------------------------------------
+ONE-TIME SETUP (only the first time on this machine)
+---------------------------------------------------------------------
+sudo apt install python3.10-venv v4l-utils
+sudo usermod -aG video $USER
+sudo reboot
+
+cd ~/Desktop/LorenzoWidmann/Code/Thesis/EmissivityCalculation
+python3 -m venv .venv
+source .venv/bin/activate
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements.txt
+
+
+---------------------------------------------------------------------
+1. CAMERA SERVER (terminal 1 -- start this FIRST)
+---------------------------------------------------------------------
+cd ~/Desktop/LorenzoWidmann/Code/Thesis/CameraServer
+python3 camera_server.py
+
+# Auto-detects the ZED capture node -- no --camera-index needed.
+# Self-closes 30s after both eyes go unused (--idle-timeout 0 to
+# disable and run until Ctrl-C).
+
+
+---------------------------------------------------------------------
+2. DRIVE VIEW (terminal 2 -- left eye, live GUI window)
+---------------------------------------------------------------------
+cd ~/Desktop/LorenzoWidmann/Code/Thesis/DriveView
+python3 drive_view.py --shared --eye left
+
+
+---------------------------------------------------------------------
+3. GRID EMISSIVITY ESTIMATION (terminal 3 -- right eye, 3x3 grid)
+---------------------------------------------------------------------
+cd ~/Desktop/LorenzoWidmann/Code/Thesis/EmissivityCalculation
+source .venv/bin/activate
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python3 main.py --shared --grid-size 3 --show --live --classify-every 30
+
+# Press 'q' in the window to quit.
+# --grid-size N       NxN grid (default 3)
+# --classify-every N  rescan the grid every Nth frame (30 keeps the
+#                     CPU load sane; lower = more frequent, heavier)
+# HF_HUB_OFFLINE/TRANSFORMERS_OFFLINE force the cached CLIP model and
+# skip the HuggingFace hub check. Drop them once (with network) to
+# download a model the first time.
+=====================================================================
