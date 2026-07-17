@@ -30,7 +30,7 @@ import time
 
 import numpy as np
 
-from livox import DEFAULT_DATA_PORT, LivoxReceiver, compute_stats
+from livox import DEFAULT_DATA_PORT, LivoxController, LivoxReceiver, compute_stats
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -44,6 +44,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                      help=f"Point-cloud UDP port (default: {DEFAULT_DATA_PORT})")
     net.add_argument("--timeout", type=float, default=3.0,
                      help="Seconds to wait for data before giving up (default: 3)")
+
+    arm = p.add_argument_group("sensor arming (Livox SDK2 control)")
+    arm.add_argument("--sensor-ip", default="192.168.1.100",
+                     help="Mid-360 IP to send the arm command to (default: "
+                          "192.168.1.100). The sensor comes up IDLE after a power "
+                          "cycle; the tool commands it into SAMPLING before "
+                          "listening, so LivoxViewer2 is no longer needed.")
+    arm.add_argument("--push-ip", default="192.168.1.50",
+                     help="Host IP the sensor should push point cloud to, written "
+                          "into the sensor (default: 192.168.1.50). This is the "
+                          "routable NIC IP, not the 0.0.0.0 bind of --host-ip.")
+    arm.add_argument("--no-arm", action="store_true",
+                     help="Skip the SDK2 arm handshake and only listen passively "
+                          "(use when the sensor is already streaming, e.g. armed "
+                          "by LivoxViewer2).")
 
     sq = p.add_argument_group("central square (angular FOV)")
     sq.add_argument("--fov-deg", type=float, default=40.0,
@@ -113,6 +128,19 @@ def main(argv: list[str] | None = None) -> int:
     if not args.json:
         print(f"Central square: {math.degrees(half_rad * 2.0):.1f} deg "
               f"(+/-{math.degrees(half_rad):.1f} deg off +x axis)")
+
+    if not args.no_arm:
+        if not args.json:
+            print(f"Arming sensor {args.sensor_ip} -> push to "
+                  f"{args.push_ip}:{args.data_port} ...", flush=True)
+        try:
+            LivoxController(args.sensor_ip, args.host_ip).arm(args.push_ip, args.data_port)
+        except (TimeoutError, OSError, RuntimeError, ValueError) as e:
+            print(f"warning: arm command failed ({e}); listening anyway -- "
+                  "start LivoxViewer2 once or pass --no-arm if already streaming.",
+                  file=sys.stderr, flush=True)
+
+    if not args.json:
         print(f"Listening on {args.host_ip}:{args.data_port} ...", flush=True)
 
     try:
