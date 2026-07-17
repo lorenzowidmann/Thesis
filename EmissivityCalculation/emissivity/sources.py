@@ -4,11 +4,65 @@ All sources return RGB numpy arrays (HxWx3, uint8) from grab().
 The ZED source imports pyzed lazily so the package works without the SDK.
 """
 
+import glob
+import os
 import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
 
 import numpy as np
+
+
+def find_v4l2_capture_index(prefer: str | None = "ZED") -> int | None:
+    """Linux: return the integer index N of the /dev/videoN node that
+    advertises the V4L2 VIDEO_CAPTURE capability, preferring one whose card
+    name contains `prefer` (e.g. the ZED's real capture node, skipping its
+    metadata-only node). Returns an int index -- not a path -- because opening
+    by /dev path can fail on some OpenCV builds while opening the same index
+    with CAP_V4L2 works. Returns None off Linux or if nothing suitable found.
+
+    Lets camera_server.py stay working when the ZED enumerates at a different
+    /dev/videoN across replugs, without a hard-coded --camera-index."""
+    if not sys.platform.startswith("linux"):
+        return None
+    import fcntl
+    import struct
+
+    VIDIOC_QUERYCAP = 0x80685600            # _IOR('V', 0, struct v4l2_capability)
+    V4L2_CAP_VIDEO_CAPTURE = 0x00000001
+    V4L2_CAP_DEVICE_CAPS = 0x80000000
+
+    def _query(path: str) -> tuple[str, int]:
+        fd = os.open(path, os.O_RDWR | os.O_NONBLOCK)
+        try:
+            buf = bytearray(104)            # sizeof(struct v4l2_capability)
+            fcntl.ioctl(fd, VIDIOC_QUERYCAP, buf)
+        finally:
+            os.close(fd)
+        _driver, card, _bus, _ver, caps, dev_caps = struct.unpack(
+            "16s32s32sIII12x", bytes(buf))
+        effective = dev_caps if caps & V4L2_CAP_DEVICE_CAPS else caps
+        return card.split(b"\x00", 1)[0].decode(errors="replace"), effective
+
+    def _index_of(path: str) -> int:
+        return int("".join(filter(str.isdigit, os.path.basename(path))))
+
+    capture: list[tuple[int, str]] = []
+    for path in sorted(glob.glob("/dev/video*"), key=_index_of):
+        try:
+            card, effective = _query(path)
+        except OSError:
+            continue
+        if effective & V4L2_CAP_VIDEO_CAPTURE:
+            capture.append((_index_of(path), card))
+
+    if not capture:
+        return None
+    if prefer:
+        for idx, card in capture:
+            if prefer.lower() in card.lower():
+                return idx
+    return capture[0][0]
 
 
 def _open_capture(cv2, device: int | str):

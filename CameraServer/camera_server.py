@@ -45,13 +45,15 @@ def _load_module(name: str, path: Path):
 
 emissivity_main = _load_module("_cameraserver_emissivity_main", _EMISSIVITY_DIR / "main.py")
 
-from emissivity.sources import WebcamSource  # noqa: E402
+from emissivity.sources import WebcamSource, find_v4l2_capture_index  # noqa: E402
 from shared_frame import FrameWriter  # noqa: E402
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--camera-index", default="0", metavar="N", help="Device index/path (default 0)")
+    p.add_argument("--camera-index", default=None, metavar="N",
+                   help="Device index/path. Omit to auto-detect the ZED capture "
+                        "node on Linux (falls back to 0).")
     p.add_argument("--idle-timeout", type=float, default=30.0, metavar="SEC",
                     help="Self-close after this many seconds with no reader activity on "
                          "either eye (default 30; 0 disables self-close, runs until Ctrl-C)")
@@ -60,7 +62,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    index = emissivity_main.parse_camera_index(args.camera_index)
+    if args.camera_index is None:
+        index = find_v4l2_capture_index(prefer="ZED")
+        if index is None:
+            index = 0
+            print("No V4L2 capture device auto-detected; using index 0.")
+        else:
+            print(f"Auto-selected camera index {index} (V4L2 capture node).")
+    else:
+        index = emissivity_main.parse_camera_index(args.camera_index)
 
     with WebcamSource(index) as source:
         frame = source.grab()
