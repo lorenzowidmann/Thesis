@@ -40,6 +40,12 @@ def parse_args():
         help="Use the ZED 2i as a plain UVC webcam (OpenCV only, no SDK/GPU needed; "
         "crops the left eye out of the side-by-side stereo frame)",
     )
+    src.add_argument(
+        "--shared", action="store_true",
+        help="Read the right eye from a running CameraServer/camera_server.py "
+        "instead of opening the camera directly -- lets the grid tool run "
+        "alongside drive_view.py off one shared ZED (start camera_server.py first)",
+    )
     p.add_argument(
         "--camera-index", default="0", metavar="N",
         help="Device index for --webcam / --zed-uvc (default 0). On Linux, also "
@@ -208,6 +214,11 @@ def main():
 
     if args.image:
         source = ImageSource(args.image)
+    elif args.shared:
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "CameraServer"))
+        from shared_frame import SharedZedSource
+        source = SharedZedSource(eye="right")
     elif args.webcam:
         source = WebcamSource(camera_index)
     elif args.zed_uvc:
