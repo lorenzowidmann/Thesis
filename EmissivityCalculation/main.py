@@ -68,7 +68,8 @@ def parse_args():
     p.add_argument(
         "--live", action="store_true",
         help="Keep grabbing and classifying frames (model loaded once) until you "
-        "press 'q' in the window or Ctrl+C. Needs --show and a camera source "
+        "press 'q' in the window or Ctrl+C. With --show opens a preview window; "
+        "without it runs headless and just prints results. Needs a camera source "
         "(--webcam/--zed/--zed-uvc), not --image",
     )
     p.add_argument(
@@ -203,9 +204,6 @@ def main():
     if args.live and args.image:
         print("--live needs a camera source (--webcam/--zed/--zed-uvc), not --image.", file=sys.stderr)
         return 2
-    if args.live and not args.show:
-        print("--live needs --show (press 'q' in the window to stop).", file=sys.stderr)
-        return 2
 
     table = EmissivityTable(args.table) if args.table else EmissivityTable()
     classifier = MaterialClassifier(table, model_name=args.clip_model)
@@ -230,10 +228,15 @@ def main():
 
     with source:
         if args.live:
-            import cv2
+            cv2 = None
+            if args.show:
+                import cv2
 
             classify_every = max(1, args.classify_every)
-            print("Live mode -- press 'q' in the image window to stop.")
+            print(
+                "Live mode -- press 'q' in the image window to stop." if args.show
+                else "Live mode (headless) -- press Ctrl+C to stop."
+            )
             cells = None
             frame_count = 0
             try:
@@ -242,13 +245,15 @@ def main():
                     if cells is None or frame_count % classify_every == 0:
                         cells = classify_grid(frame, classifier, table, rows, cols, args.roi)
                     frame_count += 1
-                    cv2.imshow("Emissivity estimation", draw_grid_overlay(frame, cells))
-                    if cv2.waitKey(1) & 0xFF == ord("q"):
-                        break
+                    if cv2 is not None:
+                        cv2.imshow("Emissivity estimation", draw_grid_overlay(frame, cells))
+                        if cv2.waitKey(1) & 0xFF == ord("q"):
+                            break
             except KeyboardInterrupt:
                 pass
             finally:
-                cv2.destroyAllWindows()
+                if cv2 is not None:
+                    cv2.destroyAllWindows()
             return 0
 
         frame = source.grab()
