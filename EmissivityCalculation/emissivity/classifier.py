@@ -53,6 +53,10 @@ class MaterialClassifier:
         text_inputs = self.processor(text=table.prompts, return_tensors="pt", padding=True)
         with torch.no_grad():
             text_feats = self.model.get_text_features(**text_inputs)
+        # transformers >= 5 returns BaseModelOutputWithPooling with the
+        # projected embeddings in pooler_output; < 5 returns the tensor.
+        if not torch.is_tensor(text_feats):
+            text_feats = text_feats.pooler_output
         self._text_feats = text_feats / text_feats.norm(dim=-1, keepdim=True)
 
     def classify(
@@ -73,6 +77,8 @@ class MaterialClassifier:
         inputs = self.processor(images=image, return_tensors="pt")
         with self._torch.no_grad():
             image_feats = self.model.get_image_features(**inputs)
+        if not self._torch.is_tensor(image_feats):
+            image_feats = image_feats.pooler_output
         image_feats = image_feats / image_feats.norm(dim=-1, keepdim=True)
         # Same computation CLIPModel.forward does for logits_per_image,
         # just against the cached text features.
