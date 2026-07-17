@@ -4,6 +4,7 @@ All sources return RGB numpy arrays (HxWx3, uint8) from grab().
 The ZED source imports pyzed lazily so the package works without the SDK.
 """
 
+import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -17,6 +18,12 @@ def _open_capture(cv2, device: int | str):
     the ZED 2i are especially prone to this. A device *path* (e.g.
     "/dev/video1") sidesteps that by opening the node directly via V4L2."""
     if isinstance(device, str) and device.startswith("/dev/"):
+        return cv2.VideoCapture(device, cv2.CAP_V4L2)
+    # On Linux, force the V4L2 backend for integer indices too: OpenCV's
+    # default backend auto-selection (FFMPEG/obsensor) can fail to open a
+    # multi-node UVC camera like the ZED 2i with EBUSY even when the V4L2
+    # backend opens the same index fine.
+    if isinstance(device, int) and sys.platform.startswith("linux"):
         return cv2.VideoCapture(device, cv2.CAP_V4L2)
     return cv2.VideoCapture(device)
 
