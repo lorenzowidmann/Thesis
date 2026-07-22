@@ -117,8 +117,8 @@ Two ways to read the camera, depending on hardware:
 **`--zed-uvc`** (works on this PC — no NVIDIA GPU here): the ZED 2i also
 shows up as a plain USB webcam. Over UVC its frame is the left+right stereo
 pair concatenated side by side (unrectified); `ZedUvcSource` just opens it
-with OpenCV like any webcam and crops the right half (matching the eye
-SensorFusion uses for CLIP classification). No depth, no rectification — not
+with OpenCV like any webcam and crops the right half (the eye used for CLIP
+classification). No depth, no rectification — not
 needed here since only a color crop is fed to CLIP. Use `--camera-index` if
 it isn't device 0 (e.g. a laptop's built-in webcam is usually 0, so the ZED
 may enumerate as 1 or 2).

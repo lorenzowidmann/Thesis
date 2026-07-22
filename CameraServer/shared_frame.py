@@ -3,8 +3,8 @@
 Windows locks a UVC device (e.g. the ZED 2i) to whichever process opens it
 first -- verified empirically: a second cv2.VideoCapture on the same index
 gets zero successful frame reads while the first is active. camera_server.py
-is the one process that owns the real camera; everything else (sensor_fusion
-.py, drive_view.py) attaches as a FrameReader/SharedZedSource instead of
+is the one process that owns the real camera; everything else
+(drive_view.py, ...) attaches as a FrameReader/SharedZedSource instead of
 opening the device itself.
 
 The seqlock (odd seq = write in progress, even = stable) avoids readers ever

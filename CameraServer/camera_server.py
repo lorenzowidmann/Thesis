@@ -3,15 +3,14 @@
 
 Windows locks a UVC device to whichever process opens it first (verified: a
 second cv2.VideoCapture on the same index gets zero successful frame reads
-while the first is active). Run this once, then point sensor_fusion.py /
-drive_view.py / extrinsic_calibration.py at it with --shared instead of
-having them open the camera directly -- lets both the headless emissivity
-pipeline and the live drive view read the ZED at the same time.
+while the first is active). Run this once, then point drive_view.py (or any
+other client) at it with --shared instead of having them open the camera
+directly -- lets several consumers read the ZED at the same time.
 
 Also self-closes when idle: if neither eye has been read (attached or
 read() called) for --idle-timeout seconds, the server shuts itself down and
-releases the camera instead of holding it forever after both
-sensor_fusion.py and drive_view.py have exited.
+releases the camera instead of holding it forever after every client has
+exited.
 
 Usage:
     py camera_server.py                  # ZED / webcam at index 0

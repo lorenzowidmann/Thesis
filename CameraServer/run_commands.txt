@@ -1,49 +1,38 @@
 =====================================================================
- RUN COMMANDS - Camera-shared workflow (emissivity + drive view)
+ RUN COMMANDS - Camera-shared workflow (drive view)
 =====================================================================
 
-Runs both eyes of the ZED at once: right eye for headless emissivity
-estimation, left eye for a live driving-view window. Windows locks a UVC
-device to whichever process opens it first, so this needs camera_server.py
-running FIRST, in its own terminal, before either client -- see
-CameraServer/README.md for why.
+Windows locks a UVC device to whichever process opens it first, so any
+--shared client needs camera_server.py running FIRST, in its own terminal
+-- see CameraServer/README.md for why.
 
---- WINDOWS, 3 separate terminals, in this order ---
+--- WINDOWS, 2 separate terminals, in this order ---
 
 # 1. Camera server (start once; self-closes 30s after both eyes go unused,
 #    so you don't need to remember to Ctrl-C it -- see --idle-timeout below)
 cd C:\Users\loren\desktop\measurment_v2\ClaudeCOde\Thesis\CameraServer
 C:\venvs\emissivity\Scripts\python.exe camera_server.py
 
-# 2. Emissivity estimation (right eye, headless, prints to terminal)
-cd C:\Users\loren\desktop\measurment_v2\ClaudeCOde\Thesis\SensorFusion
-set HF_HUB_OFFLINE=1&& set TRANSFORMERS_OFFLINE=1&& C:\venvs\emissivity\Scripts\python.exe sensor_fusion.py --shared
-
-# 3. Drive view (left eye, live GUI window)
+# 2. Drive view (left eye, live GUI window)
 cd C:\Users\loren\desktop\measurment_v2\ClaudeCOde\Thesis\DriveView
 C:\venvs\emissivity\Scripts\python.exe drive_view.py --shared --eye left
 
 --- Notes ---
-# - Step 1 only needs to be started once per session; steps 2 and 3 can be
-#   started/stopped independently, in either order, any number of times,
-#   as long as the server from step 1 is still running.
+# - Step 1 only needs to be started once per session; step 2 can be
+#   started/stopped independently, any number of times, as long as the
+#   server from step 1 is still running.
 # - The server auto-closes itself 30s after neither eye has been read
 #   (--idle-timeout SEC to change that, --idle-timeout 0 to disable and run
 #   until Ctrl-C instead). Restart it (step 1) if you come back later and
 #   it's gone.
 # - If a --shared client can't find the server, it errors out after ~5s
 #   (--timeout to change that wait).
-# - Ctrl-C stops any of the three processes individually.
-# - Emissivity output is TEXT in step 2's terminal (the classification table
-#   + a "[fusion] emissivity=... distance=..." summary line), not in the
-#   step 3 GUI window -- that window is video-only, no text overlay.
+# - Ctrl-C stops either process individually.
+# - The step 2 GUI window is video-only, no text overlay.
 
---- LINUX / UBUNTU (paths only differ; same 3-terminal order) ---
+--- LINUX / UBUNTU (paths only differ; same 2-terminal order) ---
 cd ~/Desktop/LorenzoWidmann/Code/Thesis/CameraServer
 python3 camera_server.py
-
-cd ~/Desktop/LorenzoWidmann/Code/Thesis/SensorFusion
-HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python3 sensor_fusion.py --shared
 
 cd ~/Desktop/LorenzoWidmann/Code/Thesis/DriveView
 python3 drive_view.py --shared --eye left

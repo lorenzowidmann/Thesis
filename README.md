@@ -83,44 +83,28 @@ Output: a voxel/planar-surface representation of the scene — OpenStudio-ready
 building surfaces, and the foundation for the deferred LiDAR/stereo
 co-registration and surface-geometry work.
 
-### 4. `SensorFusion/` — headless emissivity + distance, and extrinsic calibration seed
+### 4. `DriveView/` — live view from the ZED 2i's first lens
 
-A GUI-free companion to modules 1 and `LidarDistance/`, for the onboard rover
-PC whose GPU can't carry the `--show`/`--live` overlay path. `sensor_fusion.py`
-prints emissivity (from module 1's CLIP classifier) and LiDAR distance for the
-same central square, per cycle, to the terminal — no display, no file output
-yet. `extrinsic_calibration.py` is the seed of the LiDAR ↔ stereo-camera
-extrinsic calibration (the co-registration step mentioned below): it grabs a
-synced frame + LiDAR window as a live-sensor sanity check and prints an
-identity placeholder transform until a calibration target is available. Both
-scripts reuse the existing modules' functions directly rather than
-duplicating them.
-
-Output: terminal-printed emissivity + distance per cycle; later, the LiDAR →
-camera extrinsic transform.
-
-### 5. `DriveView/` — live view from the ZED 2i's first lens
-
-Module 1 / `SensorFusion` classify the ZED's **right** eye headlessly (no
+Module 1 classifies the ZED's **right** eye headlessly (no
 window). `DriveView/drive_view.py` shows the **left** eye live in a plain
 `cv2` window — no CLIP, no LiDAR, negligible GPU load — so the rover can be
-driven visually while `SensorFusion` runs headless alongside it.
+driven visually while the classification runs headless alongside it.
 `EmissivityCalculation`'s `ZedUvcSource` now takes an `eye="left"|"right"`
 argument so this reuses the same capture code instead of duplicating it.
 
 Output: a live video window for teleoperation.
 
-### 6. `CameraServer/` — shared access to one physical camera
+### 5. `CameraServer/` — shared access to one physical camera
 
 Both eyes come from the **same** ZED UVC stream, and Windows locks a UVC
 device to whichever process opens it first (verified empirically: a second
 `cv2.VideoCapture` on the same index gets zero frames). `camera_server.py`
 owns the camera once and republishes every frame over
-`multiprocessing.shared_memory` (seqlock-protected); `SensorFusion` and
+`multiprocessing.shared_memory` (seqlock-protected); consumers such as
 `DriveView` pass `--shared` to read from it instead of opening the device
-directly, so both can run at the same time.
+directly, so several can run at the same time.
 
-Output: no user-facing output — infrastructure so modules 4 and 5 can share
+Output: no user-facing output — infrastructure so multiple consumers can share
 one camera concurrently.
 
 ## How the modules connect
@@ -154,8 +138,8 @@ and documented in each module's README:
 - **Co-registration** (spatial) — the thermal, distance, and emissivity maps
   are assumed pixel-aligned; projecting the LiDAR/ZED data onto the thermal
   image is a separate step that the point-cloud module lays groundwork for.
-  `SensorFusion/extrinsic_calibration.py` is the first concrete seed of this —
-  currently an identity placeholder pending a calibration target.
+  No extrinsic calibration pipeline exists yet — it is pending a calibration
+  target.
 - **Point-cloud plane scope** — the RANSAC smoothing fits the single
   **dominant** plane at any orientation (the `u`/`v`/`z` selector picks the
   dominant facade, its perpendicular, or the roof/floor); iterating the fit to

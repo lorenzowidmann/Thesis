@@ -2,16 +2,15 @@
 """Live driving view from the ZED 2i's first lens.
 
 The ZED 2i's right eye is used for material classification in
-EmissivityCalculation (now run headless via SensorFusion, no window). This
-just shows the *left* eye live in a plain cv2 window so you can see where
-the rover is going -- a separate, cheap raw video feed with no CLIP/GPU load,
-so it can run alongside the headless SensorFusion process.
+EmissivityCalculation. This just shows the *left* eye live in a plain cv2
+window so you can see where the rover is going -- a separate, cheap raw video
+feed with no CLIP/GPU load, so it can run alongside other camera consumers.
 
 Windows locks a UVC device to whichever process opens it first, so this can't
-run at the same time as another script that opens the camera directly (e.g.
-SensorFusion with --zed-uvc). Use --shared instead, with CameraServer/
-camera_server.py running, to view the left eye while SensorFusion classifies
-the right eye from the same physical camera.
+run at the same time as another script that opens the camera directly. Use
+--shared instead, with CameraServer/camera_server.py running, to view the
+left eye while something else reads the right eye from the same physical
+camera.
 
 Usage:
     py drive_view.py                  # ZED UVC, left eye (default)

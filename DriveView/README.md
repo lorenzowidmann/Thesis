@@ -2,20 +2,20 @@
 
 Live view from the ZED 2i's **first lens**, for driving the rover — a plain
 `cv2.imshow` window, no CLIP, no LiDAR, no GPU load. Meant to run alongside
-the headless `SensorFusion/sensor_fusion.py`, which uses the *right* eye for
-classification and doesn't open a window.
+other headless camera consumers, which use the *right* eye for
+classification and don't open a window.
 
 `EmissivityCalculation`'s `ZedUvcSource` cropped only the left half of the
 ZED's side-by-side UVC frame; it now takes an `eye="left"|"right"` argument,
 so this reuses the same source class instead of reimplementing camera capture.
 
-**Running alongside `sensor_fusion.py`?** Windows locks the ZED's UVC device
-to whichever process opens it first — verified empirically, a second
+**Running alongside another camera script?** Windows locks the ZED's UVC
+device to whichever process opens it first — verified empirically, a second
 `cv2.VideoCapture` on the same index gets zero frames while the first is
-active. `drive_view.py --zed-uvc`-style direct access and `sensor_fusion.py
---zed-uvc` **cannot run at the same time**. Use `--shared` instead, with
-`CameraServer/camera_server.py` running, so both read the one physical
-stream. See `../CameraServer/README.md`.
+active. Two `--zed-uvc`-style direct accesses **cannot run at the same
+time**. Use `--shared` instead, with `CameraServer/camera_server.py`
+running, so both read the one physical stream. See
+`../CameraServer/README.md`.
 
 ## Usage
 
@@ -27,7 +27,7 @@ C:\venvs\emissivity\Scripts\python.exe drive_view.py --camera-index 1 # if the Z
 C:\venvs\emissivity\Scripts\python.exe drive_view.py --webcam         # plain webcam, for dev without a ZED
 C:\venvs\emissivity\Scripts\python.exe drive_view.py --shared         # read from a running
                                                                        # camera_server.py, so this can
-                                                                       # run alongside sensor_fusion.py
+                                                                       # run alongside other consumers
 ```
 
 Press `q` in the window or Ctrl+C to stop.
@@ -38,7 +38,7 @@ Press `q` in the window or Ctrl+C to stop.
 |------|---------|---------|
 | `--webcam` / `--shared` | off | `--webcam`: plain webcam instead of the ZED; `--shared`: read from a running `CameraServer/camera_server.py` instead of opening the camera directly |
 | `--camera-index` | `0` | Device index/path (ignored with `--shared`) |
-| `--eye` | `left` | Which ZED lens to show (`right` matches SensorFusion's classified crop) |
+| `--eye` | `left` | Which ZED lens to show (`right` matches the classified crop) |
 
 ## Structure
 
