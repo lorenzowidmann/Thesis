@@ -2,9 +2,9 @@
 
 Targets sensor_msgs/msg/PointCloud2 messages (CDR-serialized) written by
 rosbag2's sqlite3 storage backend -- e.g. the /cloud_registered topic from a
-FAST-LIO/Point-LIO-style SLAM stack. All scan messages on the chosen topic
-are merged into a single cloud (each message is one registered scan, not an
-already-accumulated map).
+FAST-LIO/Point-LIO-style SLAM stack -- and also raw livox_ros_driver2/msg/CustomMsg
+scans (e.g. /livox/lidar straight from the Livox driver, un-registered). All scan
+messages on the chosen topic are merged into a single cloud.
 
 Only stdlib (sqlite3, struct) + numpy are used -- no ROS install or extra
 CDR/rosbag package required.
@@ -20,6 +20,13 @@ import numpy as np
 from .las_loader import PointCloud
 
 _POINT_CLOUD2_TYPE = "sensor_msgs/msg/PointCloud2"
+_CUSTOM_MSG_TYPE = "livox_ros_driver2/msg/CustomMsg"
+_SUPPORTED_TYPES = (_POINT_CLOUD2_TYPE, _CUSTOM_MSG_TYPE)
+
+# livox_ros_driver2 CustomPoint: uint32 offset_time, float32 x/y/z, uint8
+# reflectivity/tag/line. Max member alignment is 4, so each element is padded
+# to a 20-byte stride in the CDR sequence.
+_CUSTOM_POINT_STRIDE = 20
 
 # sensor_msgs/msg/PointField datatype constants we know how to read.
 _FLOAT32 = 7
@@ -52,6 +59,22 @@ class _CdrReader:
         rem = self.pos % n
         if rem:
             self.pos += n - rem
+
+    def _align_origin(self, n: int) -> None:
+        # CDR alignment is relative to the start of the data, i.e. after the
+        # 4-byte encapsulation header. Matters only for n > 4 (e.g. uint64).
+        rem = (self.pos - 4) % n
+        if rem:
+            self.pos += n - rem
+
+    def u64(self) -> int:
+        self._align_origin(8)
+        val = struct.unpack_from("<Q", self.buf, self.pos)[0]
+        self.pos += 8
+        return val
+
+    def skip(self, n: int) -> None:
+        self.pos += n
 
     def u8(self) -> int:
         val = self.buf[self.pos]
@@ -151,10 +174,56 @@ def _xyz_from_message(n_points, point_step, fields, is_bigendian, data, point_st
     return pts[np.isfinite(pts).all(axis=1)]
 
 
+def _parse_custom_msg(msg_bytes: bytes):
+    """Parse a livox_ros_driver2/msg/CustomMsg CDR message.
+
+    Returns (n_points, data_bytes) where data_bytes is the raw CustomPoint
+    sequence (20-byte stride per point).
+    """
+    r = _CdrReader(msg_bytes)
+
+    # std_msgs/Header header
+    r.i32()  # stamp.sec
+    r.u32()  # stamp.nanosec
+    r.string()  # frame_id
+
+    r.u64()  # timebase
+    point_num = r.u32()
+    r.u8()  # lidar_id
+    r.skip(3)  # rsvd[3] uint8
+
+    seq_len = r.u32()  # CustomPoint[] length prefix
+    n_points = max(point_num, seq_len)
+    data = r.buf[r.pos:]
+    return n_points, data
+
+
+def _xyz_from_custom(n_points, data, point_stride: int = 1) -> np.ndarray:
+    # CDR applies no trailing pad after the final element, so the buffer can be
+    # up to (stride - member_size) bytes short; pad it out so frombuffer reads
+    # the last point cleanly.
+    need = n_points * _CUSTOM_POINT_STRIDE
+    if len(data) < need:
+        data = data + b"\x00" * (need - len(data))
+
+    dtype = np.dtype({
+        "names": ["x", "y", "z"],
+        "formats": ["<f4", "<f4", "<f4"],
+        "offsets": [4, 8, 12],
+        "itemsize": _CUSTOM_POINT_STRIDE,
+    })
+    arr = np.frombuffer(data, dtype=dtype, count=n_points)[::point_stride]
+    pts = np.column_stack([arr["x"], arr["y"], arr["z"]]).astype(np.float64)
+    return pts[np.isfinite(pts).all(axis=1)]
+
+
 def load_db3(
     path: str | Path, topic: str | None = None, stride: int = 1, point_stride: int = 1,
 ) -> PointCloud:
-    """Load and merge all PointCloud2 scans on one topic of a rosbag2 .db3 file."""
+    """Load and merge all LiDAR scans on one topic of a rosbag2 .db3 file.
+
+    Supports sensor_msgs/msg/PointCloud2 and livox_ros_driver2/msg/CustomMsg.
+    """
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"Rosbag not found: {path}")
@@ -162,24 +231,31 @@ def load_db3(
     conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     try:
         cur = conn.cursor()
-        cur.execute("SELECT id, name, type FROM topics WHERE type = ?", (_POINT_CLOUD2_TYPE,))
+        cur.execute(
+            "SELECT id, name, type FROM topics WHERE type IN (?, ?)",
+            _SUPPORTED_TYPES,
+        )
         candidates = cur.fetchall()
         if topic is not None:
             candidates = [c for c in candidates if c[1] == topic]
             if not candidates:
-                raise ValueError(f"No {_POINT_CLOUD2_TYPE} topic named '{topic}' in {path}")
+                raise ValueError(f"No supported LiDAR topic named '{topic}' in {path}")
         elif not candidates:
-            raise ValueError(f"No {_POINT_CLOUD2_TYPE} topics found in {path}")
+            supported = " / ".join(_SUPPORTED_TYPES)
+            raise ValueError(f"No supported LiDAR topics ({supported}) found in {path}")
         elif len(candidates) > 1:
-            names = ", ".join(c[1] for c in candidates)
+            names = ", ".join(f"{c[1]} [{c[2]}]" for c in candidates)
             raise ValueError(
-                f"Multiple {_POINT_CLOUD2_TYPE} topics in {path}: {names}. "
-                "Pass --db3-topic to pick one."
+                f"Multiple LiDAR topics in {path}: {names}. Pass --db3-topic to pick one."
             )
 
-        topic_id = candidates[0][0]
+        topic_id, _topic_name, msg_type = candidates[0]
+        # Order by rowid (primary key), not timestamp: some rosbag2 recordings
+        # left unfinalized ship a corrupt timestamp_idx that faults ORDER BY
+        # timestamp with "database disk image is malformed". All messages are
+        # merged into one cloud, so scan ordering does not matter here anyway.
         cur.execute(
-            "SELECT data FROM messages WHERE topic_id = ? ORDER BY timestamp",
+            "SELECT data FROM messages WHERE topic_id = ? ORDER BY id",
             (topic_id,),
         )
         rows = cur.fetchall()
@@ -191,10 +267,16 @@ def load_db3(
 
     chunks = []
     for (blob,) in rows[::stride]:
-        n_points, point_step, fields, is_bigendian, data = _parse_point_cloud2(bytes(blob))
-        if n_points == 0:
-            continue
-        chunks.append(_xyz_from_message(n_points, point_step, fields, is_bigendian, data, point_stride))
+        if msg_type == _CUSTOM_MSG_TYPE:
+            n_points, data = _parse_custom_msg(bytes(blob))
+            if n_points == 0:
+                continue
+            chunks.append(_xyz_from_custom(n_points, data, point_stride))
+        else:
+            n_points, point_step, fields, is_bigendian, data = _parse_point_cloud2(bytes(blob))
+            if n_points == 0:
+                continue
+            chunks.append(_xyz_from_message(n_points, point_step, fields, is_bigendian, data, point_stride))
 
     if not chunks:
         raise ValueError(f"No points decoded from topic in {path}")
