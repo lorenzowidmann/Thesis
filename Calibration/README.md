@@ -1,31 +1,40 @@
 # Calibration
 
-Intrinsic calibration of the **ZED 2i's right eye** — the lens the rest of the
+Camera **intrinsics** for the rover's two cameras. Each feeds our own
+provenance-tracked JSON record plus an intrinsics file for
+[LVT2Calib](https://github.com/Clothooo/lvt2calib), which does the LiDAR↔camera
+**extrinsic** calibration downstream.
+
+| Camera | Target | Script | Recovers |
+|---|---|---|---|
+| ZED 2i, right eye | checkerboard | `zed_intrinsic_calib.py` | K + distortion |
+| FLIR Vue Pro R | 4-hole heated board | `flir_intrinsic_calib.py` | K only |
+
+Only the ZED's **right eye** is solved — it is the lens the rest of the
 pipeline consumes (`EmissivityCalculation` crops it for CLIP classification).
-Only that eye is solved: no stereo baseline, no rectification, just a plain
-monocular `cv2.calibrateCamera` problem.
+No stereo baseline, no rectification.
 
-The output feeds two things: our own provenance-tracked JSON record, and an
-intrinsics file for [LVT2Calib](https://github.com/Clothooo/lvt2calib), which
-does the LiDAR↔camera **extrinsic** calibration downstream.
-
-Two scripts, deliberately separate:
+Scripts, deliberately separate:
 
 1. **`capture_zed_right.py`** — live preview, one keypress per board pose,
    writes right-eye frames to disk. Needs a camera and a display.
-2. **`zed_intrinsic_calib.py`** — folder of images in, intrinsics out. No
-   camera, no display, no imports from any other module, so it runs over SSH
-   on the rover.
+2. **`zed_intrinsic_calib.py`** — folder of images in, intrinsics out.
+3. **`flir_intrinsic_calib.py`** — same, for the thermal camera.
 
-OpenCV only (`opencv-python`, `numpy`). No ZED SDK, no CUDA, no `pyzed`.
+The two solvers need no camera, no display and import nothing from other
+modules, so they run over SSH on the rover.
 
 ## Setup
 
 ```bash
-pip3 install opencv-python numpy
+pip3 install -r requirements.txt
 ```
 
-Check whether you even need to:
+`opencv-python` and `numpy` cover everything except thermal RJPG decoding,
+which needs `flyr` (already a `RadiometricCalibration` dependency). No ZED SDK,
+no CUDA, no `pyzed`, no scipy.
+
+Check whether you even need to install:
 
 ```bash
 python3 -c "import cv2, numpy; print(cv2.__version__, numpy.__version__)"
@@ -239,13 +248,129 @@ LVT2Calib at runtime.
 
 The YAML is lossy. Don't treat it as the record.
 
+## Thermal — FLIR Vue Pro R
+
+A printed checkerboard is thermally uniform and invisible in LWIR, so the
+thermal camera is calibrated from the **same four-circular-hole board** used for
+the LVT2Calib extrinsic step. The board is heated during capture; each
+through-hole reads as a blob against it.
+
+```bash
+python3 flir_intrinsic_calib.py --image-dir thermal/ --method homography \
+    --output flir_intrinsics.json --lvt2calib-export thermal_intrinsic.yaml
+```
+
+Pipeline: read RJPG (`flyr`) → threshold by thermal contrast → 4 blob centroids
+→ correspondence against the known hole coordinates → solve K.
+
+### Read this before trusting the output
+
+**Distortion is not estimated.** Four points per view fix a homography and
+leave no redundancy for radial/tangential terms. The output is zeros, flagged
+`"distortion_estimated": false` in the JSON and in a comment in the YAML
+export. That is a real gap: LVT2Calib's own shipped
+`front_thermal_intrinsic.yaml` for a 640×512 thermal camera carries
+`k1 = -0.359`, i.e. a strongly distorting lens that a zero vector does not
+correct at all. Treat K from here as a starting point.
+
+**Capture close and tilted.** With 4 points, precision is set by capture
+geometry, not by the solver. Simulated at this camera's scale (640×512,
+fx ≈ 765, 0.5 m board, 0.3 px centroid noise):
+
+| capture | recovered fx (truth 765) | spread |
+|---|---|---|
+| 5–20 m, 0/30/45°, 20 views | 767.0 | **±59.5 (±7.8%)** |
+| 5–20 m, 60 views | 748.7 | ±22.1 (±2.9%) |
+| **2–4 m, 15–60° tilts, 60 views** | 765.2 | **±4.0 (±0.5%)** |
+
+The board spans ~19 px at 20 m. Far views add noise, not information. Shoot at
+**2–4 m**, tilt **15–60°** about both axes, aim for ≥ 20 views. The module warns
+when a view's board span falls below 60 px or when board orientation barely
+varies across the set.
+
+**A low reprojection error means little here.** Four points exactly determine a
+homography, so the residual is near zero regardless of whether the set
+constrains K. Read `capture_warnings` in the JSON instead.
+
+### Methods
+
+Both `--method` options genuinely estimate K:
+
+- `homography` — Zhang's method: a homography per view, stacked constraints on
+  ω = K⁻ᵀK⁻¹, closed-form K, then LM refinement.
+- `pnp` — bundle adjustment: K and every board pose refined together by
+  Levenberg–Marquardt, pure numpy.
+
+They are independent implementations and agree to ~0.001 px on synthetic data,
+which makes disagreement between them a useful warning sign.
+
+> Note: `cv2.decomposeHomographyMat(H, K)` and `cv2.solvePnP(..., cameraMatrix,
+> ...)` both take K as a **required input** and recover only pose. Neither can
+> calibrate a camera on its own, which is why the two methods above are used.
+
+### Detection
+
+Holes are segmented by thermal contrast. A through-hole shows whatever is
+behind the board, so its sign depends on the scene — `--polarity cold`
+(default) for holes cooler than the heated panel, `--polarity hot` otherwise.
+Centroids are intensity-weighted, not binary, because at these blob sizes a
+plain pixel-count centre quantises to ~0.5 px and that maps straight into K.
+
+Images where the filters don't yield exactly 4 blobs are skipped and reported:
+
+```
+[skip] view_012.tiff: found 3 blob(s) passing the filters, expected 4
+```
+
+**The detection defaults are unvalidated** — they were tuned against synthetic
+frames, not real captures. Use `--debug-overlay DIR` on your first real set to
+see the segmentation and centroids drawn per frame, then adjust `--polarity`,
+`--threshold`, `--min-area` / `--max-area` and `--min-circularity`.
+
+### Options
+
+| Flag | Default | Meaning |
+|------|---------|---------|
+| `--image-dir` | *required* | Folder of thermal frames (RJPG, or plain PNG/TIFF) |
+| `--method` | `homography` | `homography` (Zhang) or `pnp` (bundle adjustment) |
+| `--board-coords` | 0.5 m square | Hole coordinates, `X Y Z` per hole (12 values) |
+| `--board-config` | — | JSON instead: `{"holes": [[x,y,z], ...]}` |
+| `--polarity` | `cold` | Holes cooler or warmer than the heated board |
+| `--threshold` | `otsu` | `otsu` or `percentile` |
+| `--percentile` | `5.0` | With `--threshold percentile` |
+| `--min-area` / `--max-area` | `6` / `100000` | Blob size bounds, px |
+| `--min-circularity` | `0.5` | Blob fill ratio against a perfect disc |
+| `--debug-overlay` | — | Write per-image detection overlays here |
+| `--output` | `flir_intrinsics.json` | Canonical JSON record |
+| `--lvt2calib-export` | — | Also write an LVT2Calib intrinsics YAML |
+
+The board geometry is configurable because it is a property of the physical
+target. The default is the rover's board: holes at `(0,0)`, `(0.5,0)`,
+`(0,0.5)`, `(0.5,0.5)`, all at `z = 0`.
+
+### Correspondence
+
+Detected blobs come in arbitrary order, so both sets are wound
+counter-clockwise, which fixes the labelling up to a cyclic shift. The default
+board is a square and therefore 4-fold symmetric: every shift is the same
+target rotated about its normal, absorbed by that view's own `R`, so it cannot
+affect K. For an asymmetric board the shift matters, and a second pass scores
+each candidate against a provisional K.
+
+Image `y` points down, so a counter-clockwise winding in pixels is clockwise in
+the board frame. That consistent flip is equivalent to viewing the board from
+its far side and is likewise absorbed by `R` — verified against synthetic
+truth, both windings recovering fx within 0.3%.
+
 ## Structure
 
 ```
 Calibration/
-├── capture_zed_right.py    # live capture: keypress -> right-eye PNG
-├── zed_intrinsic_calib.py  # headless: images -> K, distortion, JSON + LVT2Calib YAML
-├── ZedCaptures/            # captured frames (gitignored)
+├── capture_zed_right.py     # live capture: keypress -> right-eye PNG
+├── zed_intrinsic_calib.py   # ZED right eye: images -> K + distortion
+├── flir_intrinsic_calib.py  # FLIR thermal: 4-hole board -> K (no distortion)
+├── requirements.txt
+├── ZedCaptures/             # captured frames (gitignored)
 └── README.md
 ```
 
@@ -275,3 +400,16 @@ Calibration/
   the adaptive window. Worth knowing before anyone "simplifies" it back.
 - Only the right eye is calibrated. The left eye and the stereo baseline are
   out of scope.
+- **The thermal module has never seen a real RJPG.** Both solvers are validated
+  against synthetic 4-hole boards rendered through a known `K`, recovering
+  fx/fy/cx/cy *exactly* (765.000 / 320.00 / 256.00, 0.0000 px residual) at zero
+  noise, and both agree to 0.001 px with each other. Detection thresholds,
+  `flyr`'s `.celsius` path and the hole polarity are all unexercised on real
+  data — see *Detection* above.
+- **`flyr`'s `.celsius` output is used for thermal detection.** That is
+  acceptable here because only relative contrast is needed to find the holes;
+  no absolute temperature is claimed or used. Do not take this as precedent for
+  the radiometric pipeline, which has stricter requirements.
+- **A wrong `--board-coords` produces a confident, wrong K** rather than an
+  error — the solve has no way to notice the geometry doesn't match the target.
+  Measure the real board.

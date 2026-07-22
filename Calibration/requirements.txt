@@ -1,0 +1,3 @@
+opencv-python
+numpy
+flyr  # radiometric JPEG (RJPG) decoding, thermal only -- flir_intrinsic_calib.py
