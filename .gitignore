@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+
+# Calibration capture frames (large, machine-specific)
+Calibration/ZedCaptures/
