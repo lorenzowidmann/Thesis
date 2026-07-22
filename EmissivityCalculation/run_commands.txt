@@ -7,7 +7,19 @@ cd C:\Users\loren\desktop\measurment_v2\ClaudeCOde\Thesis\EmissivityCalculation
 set HF_HUB_OFFLINE=1&& set TRANSFORMERS_OFFLINE=1&& C:\venvs\emissivity\Scripts\python.exe main.py --zed-uvc --show --live
 
 
---- LINUX / UBUNTU ---
+--- LINUX / UBUNTU (server/morpheus) - WORKING HEADLESS, SHARED CAMERA ---
+# Headless (no GUI), reads the right eye from a running camera_server.py.
+# Start camera_server.py FIRST (see CameraServer/run_commands.txt), then:
+cd ~/Desktop/LorenzoWidmann/Code/Thesis/EmissivityCalculation
+source .venv/bin/activate
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python main.py --shared
+
+# ONE-TIME FIX (only if it crashes with
+#   AttributeError: module 'PIL.Image' has no attribute 'Resampling'):
+# system Pillow is too old for transformers/CLIP. Inside the venv:
+pip install --upgrade 'Pillow>=9.1'
+
+--- LINUX / UBUNTU - GUI / direct camera (no server) ---
 cd ~/Desktop/LorenzoWidmann/Code/Thesis/EmissivityCalculation
 source .venv/bin/activate
 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python3 main.py --zed-uvc --camera-index 0 --show --live
