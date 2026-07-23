@@ -56,6 +56,12 @@ def parse_args():
         help="Keep every Nth point within each kept scan (default 1: use all)",
     )
     p.add_argument(
+        "--crop", type=float, default=None, metavar="R",
+        help="Keep only points within R metres (per axis) of the densest "
+             "region, dropping diverged/drift outliers (e.g. from a bad SLAM "
+             "run) before the pipeline runs",
+    )
+    p.add_argument(
         "--voxel-size", type=float, default=0.20,
         help="Initial voxel edge in metres (GUI slider range 0.05-1.0)",
     )
@@ -210,6 +216,21 @@ def main():
     else:
         print(f"Loading {args.las} ...")
         pc = load_las(args.las)
+
+    if args.crop is not None:
+        from octree.las_loader import PointCloud
+        # Anchor on the densest coarse cell, not the mean/median: a diverged
+        # SLAM run can put the majority of points in the drift streak, so
+        # those robust statistics land in the garbage. The densest cell tracks
+        # the real, repeatedly-scanned scene.
+        cell = 5.0
+        u, c = np.unique(np.floor(pc.points / cell), axis=0, return_counts=True)
+        center = (u[c.argmax()] + 0.5) * cell
+        keep = (np.abs(pc.points - center) < args.crop).all(axis=1)
+        n0 = len(pc)
+        pc = PointCloud(pc.points[keep], pc.labels[keep])
+        print(f"Crop {args.crop} m of densest region {np.round(center, 1)}: "
+              f"kept {keep.sum():,}/{n0:,} ({100 * keep.mean():.1f}%)")
 
     if args.info:
         print_info(pc)
