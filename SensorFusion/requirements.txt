@@ -1,0 +1,5 @@
+# pyzed (the ZED SDK Python API) is NOT pip-installable here -- install it by
+# running the ZED SDK's get_python_api.py after installing the SDK itself
+# (https://www.stereolabs.com/developers/release/). Listed for reference only.
+# pyzed
+opencv-python
