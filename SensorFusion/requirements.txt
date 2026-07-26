@@ -2,4 +2,12 @@
 # running the ZED SDK's get_python_api.py after installing the SDK itself
 # (https://www.stereolabs.com/developers/release/). Listed for reference only.
 # pyzed
+
+# zed_record.py
 opencv-python
+
+# sync_manifest.py
+flyr            # FLIR radiometric-JPEG reader (also used in RadiometricCalibration)
+rosbags         # LiDAR rosbag2 /Odometry reader (also used in PointCloudView)
+Pillow          # FLIR EXIF timestamps + ZED PNG display
+matplotlib      # Stage-1 steppable event-sync viewer
