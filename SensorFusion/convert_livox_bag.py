@@ -150,6 +150,7 @@ def main() -> None:
 
         print()
         count = 0
+        seq_counters = {}  # ROS1 std_msgs/Header.seq, incrementale per topic
         for conn, timestamp, raw in reader.messages():
             if conn.id not in conn_map:
                 continue
@@ -160,6 +161,17 @@ def main() -> None:
             # package, quindi la rimappatura del namespace e' trasparente).
             out_type = dst_type if conn.msgtype == src_type else conn.msgtype
             msg = ts_ros2.deserialize_cdr(raw, conn.msgtype)
+            # std_msgs/Header ha il campo `seq` in ROS1 ma non in ROS2: senza
+            # questo serialize_ros1 fallisce con
+            #   AttributeError: 'std_msgs__msg__Header' object has no attribute 'seq'
+            # Lo aggiungiamo con un contatore incrementale per topic (come farebbe
+            # ROS1). Vale per qualsiasi messaggio con header (Imu, PointCloud2,
+            # Odometry, CustomMsg, ...).
+            hdr = getattr(msg, "header", None)
+            if hdr is not None and not hasattr(hdr, "seq"):
+                seq = seq_counters.get(conn.id, 0)
+                hdr.seq = seq
+                seq_counters[conn.id] = seq + 1
             raw1 = ts_ros1.serialize_ros1(msg, out_type)
             writer.write(conn_map[conn.id], timestamp, raw1)
             count += 1
