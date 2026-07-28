@@ -1,9 +1,19 @@
 """Record-only capture utility for the ZED 2i (SVO2 + mp4 + still frames).
 
-Opens the ZED 2i via the ZED SDK (pyzed) and captures, in parallel, three
-outputs into one timestamped session folder:
+Two capture backends (see --backend):
 
-  1. a native SVO2 recording (.svo2) — the lossless-container master, encoded
+  * sdk  — opens the ZED 2i via the ZED SDK (pyzed). Full stereo master:
+           native SVO2 (.svo2) + mp4 + PNG frames. Requires an NVIDIA GPU
+           with CUDA (the SDK is CUDA-only).
+  * uvc  — opens the ZED 2i as a plain USB video (UVC) device via OpenCV.
+           No SDK, no GPU: works on the rover (no NVIDIA card). RGB only —
+           no SVO2 and no depth. The camera streams both eyes side-by-side
+           in one frame; we split out the chosen --eye. mp4 + PNG frames.
+
+Default backend is 'auto': try the SDK, and if pyzed is not importable fall
+back to UVC automatically. Outputs land in one timestamped session folder:
+
+  1. (sdk only) a native SVO2 recording (.svo2) — lossless container master,
      H264 by default (--svo-compression);
   2. a plain, viewable mp4 built from one RGB eye (--eye) via OpenCV VideoWriter;
   3. still frames dumped every --frame-interval seconds as PNGs into frames/ —
@@ -25,9 +35,11 @@ Usage:
     py zed_record.py                                  # record until Ctrl+C
     py zed_record.py --duration 60                    # record 60 s then stop
     py zed_record.py --resolution HD720 --fps 60
-    py zed_record.py --svo-compression lossless
+    py zed_record.py --svo-compression lossless       # sdk backend only
     py zed_record.py --frame-interval 2.0             # a PNG every 2 s
-    py zed_record.py --no-mp4 --no-frames             # SVO only
+    py zed_record.py --no-mp4 --no-frames             # SVO only (sdk)
+    py zed_record.py --backend uvc                    # force UVC (no GPU/SDK)
+    py zed_record.py --backend uvc --camera-index 2   # pick the ZED device
 
 TODO(emissivity): EmissivityCalculation/ could consume a finished session
 directly (point its --image loop at <session>/frames/*.png, or extract frames
@@ -56,6 +68,16 @@ SVO_COMPRESSIONS = {
     "lossless": "LOSSLESS",
 }
 
+# UVC (no-SDK) side-by-side stereo frame geometry per resolution:
+# (full_width = 2 x eye_width, full_height, max_fps). The ZED streams both eyes
+# in one MJPG frame; eye_width = full_width // 2.
+UVC_RESOLUTIONS = {
+    "HD2K": (4416, 1242, 15),
+    "HD1080": (3840, 1080, 30),
+    "HD720": (2560, 720, 60),
+    "VGA": (1344, 376, 100),
+}
+
 
 def parse_args():
     p = argparse.ArgumentParser(description="ZED 2i recorder (SVO2 + mp4 + frames)")
@@ -64,6 +86,18 @@ def parse_args():
         help="Parent directory for session folders (default: recordings/ next "
         "to this script). Each run creates a timestamped sub-folder holding "
         "session.svo2, session_left.mp4, frames/, and metadata.json.",
+    )
+    p.add_argument(
+        "--backend", choices=("auto", "sdk", "uvc"), default="auto",
+        help="Capture backend: 'sdk' (ZED SDK/pyzed, needs NVIDIA CUDA, gives "
+        "SVO2+depth), 'uvc' (plain USB webcam via OpenCV, no GPU/SDK, RGB only, "
+        "no SVO), or 'auto' (default: try sdk, fall back to uvc if pyzed is "
+        "missing).",
+    )
+    p.add_argument(
+        "--camera-index", type=int, default=0, metavar="N",
+        help="UVC backend only: OpenCV VideoCapture device index for the ZED "
+        "(default 0). Bump this if another camera grabs index 0.",
     )
     p.add_argument(
         "--duration", type=float, default=None, metavar="SEC",
@@ -82,9 +116,9 @@ def parse_args():
     )
     p.add_argument(
         "--svo-compression", choices=tuple(SVO_COMPRESSIONS), default="h264",
-        help="SVO2 compression mode: 'h264' (default, GPU-encoded, small), "
-        "'h265' (smaller, more GPU load), or 'lossless' (no quality loss, "
-        "large files).",
+        help="SVO2 compression mode (sdk backend only): 'h264' (default, "
+        "GPU-encoded, small), 'h265' (smaller, more GPU load), or 'lossless' "
+        "(no quality loss, large files).",
     )
     p.add_argument(
         "--frame-interval", type=float, default=1.0, metavar="SEC",
@@ -125,14 +159,17 @@ def utc_now_iso() -> str:
 def build_metadata(args, session_dir, camera_info, outputs, started_iso,
                    stopped_iso, duration_s, frames):
     """Provenance-style session sidecar, matching this codebase's flat
-    json.dumps(doc, indent=2) style (cf. octree.smoothing.to_openstudio_json)."""
+    json.dumps(doc, indent=2) style (cf. octree.smoothing.to_openstudio_json).
+    outputs["svo"] is None on the UVC backend (no SVO master)."""
+    svo = outputs["svo"]
     return {
         "schema": "zed_record/v1",
         "generated_by": "zed_record.py",
+        "backend": outputs["backend"],
         "camera": camera_info,
         "recording": {
-            "svo_path": outputs["svo"].name,
-            "svo_compression": args.svo_compression,
+            "svo_path": None if svo is None else svo.name,
+            "svo_compression": None if svo is None else args.svo_compression,
             "mp4_path": None if outputs["mp4"] is None else outputs["mp4"].name,
             "frames_dir": None if outputs["frames_dir"] is None else outputs["frames_dir"].name,
             "export_eye": args.eye,
@@ -157,21 +194,22 @@ def write_metadata(path, doc):
     path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
 
 
-def main():
-    args = parse_args()
+def prepare_session(args):
+    """Create the timestamped session folder and resolve output paths shared by
+    both backends. Returns (session_dir, mp4_path, frames_dir, metadata_path)."""
+    session_name = args.session_name or datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    session_dir = Path(args.output_dir) / session_name
+    session_dir.mkdir(parents=True, exist_ok=True)
+    mp4_path = None if args.no_mp4 else session_dir / f"session_{args.eye}.mp4"
+    frames_dir = None if args.no_frames else session_dir / "frames"
+    if frames_dir is not None:
+        frames_dir.mkdir(exist_ok=True)
+    metadata_path = session_dir / "metadata.json"
+    return session_dir, mp4_path, frames_dir, metadata_path
 
-    try:
-        import pyzed.sl as sl
-    except ImportError:
-        print(
-            "ZED SDK not installed. Install the ZED SDK from "
-            "https://www.stereolabs.com/developers/release/ and then the pyzed "
-            "Python API (run the SDK's get_python_api.py). Requires an NVIDIA "
-            "GPU with CUDA.",
-            file=sys.stderr,
-        )
-        return 1
 
+def record_sdk(args, sl):
+    """SDK backend: SVO2 master + mp4 + PNG frames. Requires NVIDIA CUDA."""
     import time
 
     # --- open the camera -----------------------------------------------------
@@ -196,16 +234,8 @@ def main():
         return 1
 
     # --- session folder + output paths --------------------------------------
-    session_name = args.session_name or datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    session_dir = Path(args.output_dir) / session_name
-    session_dir.mkdir(parents=True, exist_ok=True)
-
+    session_dir, mp4_path, frames_dir, metadata_path = prepare_session(args)
     svo_path = session_dir / "session.svo2"
-    mp4_path = None if args.no_mp4 else session_dir / f"session_{args.eye}.mp4"
-    frames_dir = None if args.no_frames else session_dir / "frames"
-    if frames_dir is not None:
-        frames_dir.mkdir(exist_ok=True)
-    metadata_path = session_dir / "metadata.json"
 
     # --- camera info for the sidecar ----------------------------------------
     info = zed.get_camera_information()
@@ -249,18 +279,19 @@ def main():
     frame_idx = 0
     runtime = sl.RuntimeParameters()
 
+    def outputs(stop_reason):
+        return {"svo": svo_path, "mp4": mp4_path, "frames_dir": frames_dir,
+                "stop_reason": stop_reason, "backend": "sdk"}
+
     # Write a partial sidecar up front so a crash still leaves provenance.
     write_metadata(
         metadata_path,
-        build_metadata(
-            args, session_dir, camera_info,
-            {"svo": svo_path, "mp4": mp4_path, "frames_dir": frames_dir, "stop_reason": None},
-            started_iso, None, None, frames,
-        ),
+        build_metadata(args, session_dir, camera_info, outputs(None),
+                       started_iso, None, None, frames),
     )
 
     print(
-        f"Recording -> {session_dir}\n"
+        f"Recording (sdk) -> {session_dir}\n"
         f"  svo: {svo_path.name} ({args.svo_compression})"
         + ("" if writer is None else f"  |  mp4: {mp4_path.name}")
         + ("" if frames_dir is None else f"  |  frames: every {args.frame_interval}s")
@@ -307,11 +338,8 @@ def main():
     duration_s = time.monotonic() - started_monotonic
     write_metadata(
         metadata_path,
-        build_metadata(
-            args, session_dir, camera_info,
-            {"svo": svo_path, "mp4": mp4_path, "frames_dir": frames_dir, "stop_reason": stop_reason},
-            started_iso, stopped_iso, duration_s, frames,
-        ),
+        build_metadata(args, session_dir, camera_info, outputs(stop_reason),
+                       started_iso, stopped_iso, duration_s, frames),
     )
 
     print(
@@ -319,6 +347,163 @@ def main():
         f"{len(frames)} frame(s). Wrote {metadata_path}"
     )
     return 0
+
+
+def record_uvc(args):
+    """UVC backend: open the ZED as a plain USB webcam via OpenCV — no SDK, no
+    NVIDIA GPU. RGB only (no SVO/depth). The ZED streams both eyes side-by-side
+    in one frame; we split out the chosen --eye for the mp4 + PNG frames."""
+    import time
+
+    import cv2
+
+    full_w, full_h, fps_cap = UVC_RESOLUTIONS[args.resolution]
+    fps = min(args.fps, fps_cap)
+
+    # --- open the camera as a UVC device ------------------------------------
+    cap = cv2.VideoCapture(args.camera_index, cv2.CAP_ANY)
+    if not cap.isOpened():
+        print(
+            f"Could not open the ZED as a UVC device (index {args.camera_index}). "
+            "Check the USB connection and try a different --camera-index.",
+            file=sys.stderr,
+        )
+        return 1
+    # MJPG is what the ZED exposes for the full side-by-side resolutions.
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, full_w)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, full_h)
+    cap.set(cv2.CAP_PROP_FPS, fps)
+
+    # Trust what the driver actually gave us (it may clamp the request).
+    act_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or full_w
+    act_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or full_h
+    eye_w = act_w // 2
+
+    # --- session folder + output paths --------------------------------------
+    session_dir, mp4_path, frames_dir, metadata_path = prepare_session(args)
+
+    camera_info = {
+        "resolution": args.resolution,
+        "fps": fps,
+        "serial_number": None,
+        "model": "ZED 2i (UVC)",
+    }
+
+    # --- which half of the side-by-side frame is the chosen eye -------------
+    # ZED UVC layout: left eye in the left half, right eye in the right half.
+    def crop_eye(frame):
+        return frame[:, :eye_w] if args.eye == "left" else frame[:, eye_w:]
+
+    # --- optional mp4 writer (single eye) -----------------------------------
+    writer = None
+    if mp4_path is not None:
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        writer = cv2.VideoWriter(str(mp4_path), fourcc, float(fps), (eye_w, act_h))
+
+    started_iso = utc_now_iso()
+    started_monotonic = time.monotonic()
+    frames = []
+    next_frame_at = 0.0
+    frame_idx = 0
+
+    def outputs(stop_reason):
+        return {"svo": None, "mp4": mp4_path, "frames_dir": frames_dir,
+                "stop_reason": stop_reason, "backend": "uvc"}
+
+    # Write a partial sidecar up front so a crash still leaves provenance.
+    write_metadata(
+        metadata_path,
+        build_metadata(args, session_dir, camera_info, outputs(None),
+                       started_iso, None, None, frames),
+    )
+
+    print(
+        f"Recording (uvc, no SDK/GPU) -> {session_dir}\n"
+        f"  eye: {args.eye} {eye_w}x{act_h} @ {fps}fps  (no SVO on this backend)"
+        + ("" if writer is None else f"  |  mp4: {mp4_path.name}")
+        + ("" if frames_dir is None else f"  |  frames: every {args.frame_interval}s")
+        + "\nPress Ctrl+C to stop"
+        + ("" if args.duration is None else f" (auto-stops after {args.duration}s).")
+    )
+
+    stop_reason = "interrupted"
+    try:
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                continue  # dropped frame; keep going
+            elapsed = time.monotonic() - started_monotonic
+
+            need_mp4 = writer is not None
+            need_png = frames_dir is not None and elapsed >= next_frame_at
+            if need_mp4 or need_png:
+                eye = crop_eye(frame)
+                if need_mp4:
+                    writer.write(eye)
+                if need_png:
+                    fname = f"{args.eye}_{frame_idx:06d}.png"
+                    cv2.imwrite(str(frames_dir / fname), eye)
+                    frames.append({"file": fname, "t_offset_s": round(elapsed, 3)})
+                    frame_idx += 1
+                    next_frame_at += args.frame_interval
+
+            if args.duration is not None and elapsed >= args.duration:
+                stop_reason = "duration"
+                break
+    except KeyboardInterrupt:
+        stop_reason = "interrupted"
+        print("\nStopping (Ctrl+C) ...")
+    finally:
+        cap.release()
+        if writer is not None:
+            writer.release()
+
+    stopped_iso = utc_now_iso()
+    duration_s = time.monotonic() - started_monotonic
+    write_metadata(
+        metadata_path,
+        build_metadata(args, session_dir, camera_info, outputs(stop_reason),
+                       started_iso, stopped_iso, duration_s, frames),
+    )
+
+    print(
+        f"Done ({stop_reason}, {duration_s:.1f}s). "
+        f"{len(frames)} frame(s). Wrote {metadata_path}"
+    )
+    return 0
+
+
+def main():
+    args = parse_args()
+
+    if args.backend == "uvc":
+        return record_uvc(args)
+
+    try:
+        import pyzed.sl as sl
+    except ImportError:
+        if args.backend == "sdk":
+            print(
+                "ZED SDK not installed. Install the ZED SDK from "
+                "https://www.stereolabs.com/developers/release/ and then the "
+                "pyzed Python API (run the SDK's get_python_api.py). Requires an "
+                "NVIDIA GPU with CUDA. On a machine with no NVIDIA GPU, run with "
+                "--backend uvc instead (RGB frames only, no SVO/depth).",
+                file=sys.stderr,
+            )
+            return 1
+        # auto: no SDK -> fall back to the GPU-free UVC path (the rover case).
+        print(
+            "ZED SDK (pyzed) not available; falling back to UVC capture "
+            "(RGB frames only, no SVO/depth — no NVIDIA GPU needed). "
+            "Use --backend sdk to require the SDK, or --backend uvc to silence "
+            "this notice.",
+            file=sys.stderr,
+        )
+        return record_uvc(args)
+
+    return record_sdk(args, sl)
 
 
 if __name__ == "__main__":
