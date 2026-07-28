@@ -152,10 +152,11 @@ def parse_args():
 
 
 def utc_now_iso() -> str:
-    """ISO-8601 UTC timestamp, seconds resolution (e.g. 2026-07-26T14:03:11Z)."""
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
-        "+00:00", "Z"
-    )
+    """ISO-8601 UTC timestamp with microsecond resolution
+    (e.g. 2026-07-28T14:03:11.482913Z). Sub-second precision matters for
+    clock-sync verification against the LiDAR's nanosecond ROS2 header stamps;
+    rounding to whole seconds here was the dominant noise source in that diff."""
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def build_metadata(args, session_dir, camera_info, outputs, started_iso,
