@@ -471,6 +471,11 @@ def record_uvc(args):
         f"Done ({stop_reason}, {duration_s:.1f}s). "
         f"{len(frames)} frame(s). Wrote {metadata_path}"
     )
+    # Print the exit wall-clock stamp (same value as metadata's stopped_utc) so
+    # it can be diffed against an external clock (`date`, LiDAR ROS2 clock)
+    # taken right after the script exits — camera-open/negotiation latency is
+    # already behind us here, so this is a clean clock comparison point.
+    print(f"stopped_utc {stopped_iso}")
     return 0
 
 
