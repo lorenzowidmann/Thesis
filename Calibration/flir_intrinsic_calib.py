@@ -69,6 +69,24 @@ _SUBPIX_CRITERIA = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 1e-3
 _MIN_VIEWS = 3
 _RECOMMENDED_VIEWS = 10
 
+# Distortion models. The full model estimates all of k1,k2,p1,p2,k3 (the default,
+# and what this tool has always done). On a small-sensor / cheap-lens thermal
+# camera the highest-order terms are poorly constrained by only ~15 corners per
+# view and k3 tends to blow up while absorbing noise -- diagnose_flir_calib.py
+# quantifies that. The reduced models fix the excluded coefficients to 0 so the
+# fit cannot spend freedom on them:
+#   reduced  -> k1,k2 only     (fix k3, zero tangential)
+#   minimal  -> k1 only        (fix k2, fix k3, zero tangential)
+# Reduced models are solved from an explicit intrinsic guess so the fixed-to-zero
+# distortion doesn't drag K; the guess focal is the theoretical pinhole value
+# f_px = f_mm / pixel_pitch_mm = 8.0 / 0.017 ~= 470 for the Vue Pro R.
+_DISTORTION_MODELS: dict[str, tuple[int, bool]] = {
+    "full": (0, False),
+    "reduced": (cv2.CALIB_FIX_K3 | cv2.CALIB_ZERO_TANGENT_DIST, True),
+    "minimal": (cv2.CALIB_FIX_K3 | cv2.CALIB_FIX_K2 | cv2.CALIB_ZERO_TANGENT_DIST, True),
+}
+_FOCAL_GUESS_PX = 470.0
+
 
 # --------------------------------------------------------------------------- #
 # Results                                                                      #
@@ -93,6 +111,7 @@ class CalibrationResult:
     images_skipped: list[SkippedImage] = field(default_factory=list)
     checkerboard_size: tuple[int, int] = (0, 0)  # inner corners (cols, rows)
     square_size: float = 0.0                     # metres
+    distortion_model: str = "full"               # full | reduced | minimal
 
     @property
     def fx(self) -> float:
@@ -292,8 +311,16 @@ def calibrate(
     pattern_size: tuple[int, int],
     square_size: float,
     skipped: list[SkippedImage] | None = None,
+    distortion_model: str = "full",
 ) -> CalibrationResult:
     """Solve K and the distortion coefficients, and score the fit per image.
+
+    `distortion_model` selects how many distortion terms are estimated (see
+    _DISTORTION_MODELS): "full" estimates k1,k2,p1,p2,k3; "reduced" fixes k3 and
+    the tangential terms to 0; "minimal" also fixes k2. Fixed coefficients read
+    exactly 0 in the result. The reduced models solve from an explicit intrinsic
+    guess (CALIB_USE_INTRINSIC_GUESS) so zeroing the high-order distortion does
+    not drag the focal length.
 
     Per-image error is the RMS reprojection residual in pixels, the same
     definition as calibrateCamera's overall return value, so the two are
@@ -309,12 +336,32 @@ def calibrate(
             "board is fully visible and in focus)"
         )
 
+    if distortion_model not in _DISTORTION_MODELS:
+        raise RuntimeError(
+            f"unknown distortion model {distortion_model!r} "
+            f"(choose from {', '.join(_DISTORTION_MODELS)})"
+        )
+    flags, use_guess = _DISTORTION_MODELS[distortion_model]
+
     obj = checkerboard_object_points(pattern_size, square_size)
     obj_points = [obj] * len(corners_list)
 
-    rms, K, dist, rvecs, tvecs = cv2.calibrateCamera(
-        obj_points, corners_list, image_size, None, None
-    )
+    if use_guess:
+        w, h = image_size
+        K0 = np.array(
+            [[_FOCAL_GUESS_PX, 0.0, w / 2.0],
+             [0.0, _FOCAL_GUESS_PX, h / 2.0],
+             [0.0, 0.0, 1.0]],
+            dtype=np.float64,
+        )
+        rms, K, dist, rvecs, tvecs = cv2.calibrateCamera(
+            obj_points, corners_list, image_size, K0, np.zeros(5),
+            flags=flags | cv2.CALIB_USE_INTRINSIC_GUESS,
+        )
+    else:
+        rms, K, dist, rvecs, tvecs = cv2.calibrateCamera(
+            obj_points, corners_list, image_size, None, None, flags=flags
+        )
 
     per_image: dict[str, float] = {}
     for name, objp, imgp, rvec, tvec in zip(used, obj_points, corners_list, rvecs, tvecs):
@@ -333,6 +380,7 @@ def calibrate(
         images_skipped=list(skipped or []),
         checkerboard_size=pattern_size,
         square_size=float(square_size),
+        distortion_model=distortion_model,
     )
 
 
@@ -354,6 +402,7 @@ def save_json(result: CalibrationResult, path: Path, provenance: dict) -> None:
         "dist_coeffs": result.dist_coeffs.tolist(),
         "dist_coeff_order": ["k1", "k2", "p1", "p2", "k3"],
         "distortion_estimated": True,
+        "distortion_model": result.distortion_model,
         "fx": result.fx, "fy": result.fy, "cx": result.cx, "cy": result.cy,
         "image_size": {"width": result.image_size[0], "height": result.image_size[1]},
         "reprojection_error": {
@@ -454,6 +503,12 @@ def parse_args():
         help="Checkerboard square edge in metres (e.g. 0.025 for 25 mm)",
     )
     p.add_argument(
+        "--distortion-model", choices=list(_DISTORTION_MODELS), default="full",
+        help="Distortion terms to estimate: full=k1,k2,p1,p2,k3 (default); "
+             "reduced=k1,k2 only; minimal=k1 only. Use reduced/minimal when "
+             "diagnose_flir_calib.py shows k3 is unstable/overfitting on this camera",
+    )
+    p.add_argument(
         "--clahe", action="store_true",
         help="Apply CLAHE local contrast equalisation before detection -- helps "
              "when a hot/cold background has crushed the board's thermal contrast",
@@ -491,7 +546,8 @@ def main():
               f"{pattern[0]}x{pattern[1]} inner corners...")
         used, corners_list, image_size, skipped = detect_all(
             paths, pattern, args.clahe, args.verbose)
-        result = calibrate(used, corners_list, image_size, pattern, args.square_size, skipped)
+        result = calibrate(used, corners_list, image_size, pattern, args.square_size,
+                           skipped, args.distortion_model)
     except (FileNotFoundError, NotADirectoryError, RuntimeError) as exc:
         raise SystemExit(f"error: {exc}") from None
 
@@ -508,7 +564,8 @@ def main():
     save_json(result, out, provenance)
 
     print(f"\nFLIR {image_size[0]}x{image_size[1]}, "
-          f"{len(result.images_used)}/{len(paths)} images used")
+          f"{len(result.images_used)}/{len(paths)} images used, "
+          f"distortion model: {result.distortion_model}")
     print(f"  fx={result.fx:.3f}  fy={result.fy:.3f}  "
           f"cx={result.cx:.3f}  cy={result.cy:.3f}")
     print("  dist (k1 k2 p1 p2 k3) = "
