@@ -95,6 +95,13 @@ def main() -> None:
              "koide3/livox_to_pointcloud2). Usare livox_ros_driver2 per "
              "preservare il namespace originale.",
     )
+    parser.add_argument(
+        "--topics", nargs="+", default=None, metavar="TOPIC",
+        help="Converti SOLO questi topic (default: tutti). Per il solo passo "
+             "livox_to_pointcloud2 basta --topics /livox/lidar, che evita di "
+             "riserializzare /cloud_registered (PointCloud2, il grosso del bag) "
+             "e velocizza molto la conversione.",
+    )
     args = parser.parse_args()
 
     src = Path(args.src)
@@ -131,6 +138,9 @@ def main() -> None:
         conn_map = {}
 
         for conn in reader.connections:
+            if args.topics is not None and conn.topic not in args.topics:
+                print(f"  [--]   {conn.topic}  ({conn.msgtype})  (escluso da --topics)")
+                continue
             # rimappa il namespace del CustomMsg, lascia intatti gli altri tipi
             out_type = dst_type if conn.msgtype == src_type else conn.msgtype
 
@@ -148,7 +158,13 @@ def main() -> None:
             suffix = f"  ->  {out_type}" if out_type != conn.msgtype else ""
             print(f"  [OK]   {conn.topic}  ({conn.msgtype}){suffix}")
 
-        print()
+        # Totale messaggi da scrivere, per la barra di avanzamento (senza il
+        # filtro --topics e' tutto il bag; altrimenti solo i topic selezionati).
+        total = sum(
+            c.msgcount for c in reader.connections if c.id in conn_map
+        )
+        print(f"Conversione di {total} messaggi (deserialize CDR -> serialize ROS1)...")
+
         count = 0
         seq_counters = {}  # ROS1 std_msgs/Header.seq, incrementale per topic
         for conn, timestamp, raw in reader.messages():
@@ -175,6 +191,9 @@ def main() -> None:
             raw1 = ts_ros1.serialize_ros1(msg, out_type)
             writer.write(conn_map[conn.id], timestamp, raw1)
             count += 1
+            if count % 500 == 0 or count == total:
+                print(f"\r  {count}/{total} messaggi", end="", flush=True)
+        print()
 
     print(f"Fatto. {count} messaggi scritti in {dst}")
     print()
