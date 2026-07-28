@@ -121,9 +121,11 @@ def parse_args():
         "(no quality loss, large files).",
     )
     p.add_argument(
-        "--frame-interval", type=float, default=1.0, metavar="SEC",
-        help="Dump one PNG this often, for EmissivityCalculation to read "
-        "(default 1.0 s). The full stereo stream still lives in the SVO/mp4.",
+        "--frame-interval", type=float, default=0.0, metavar="SEC",
+        help="Seconds between dumped PNGs, for EmissivityCalculation to read. "
+        "Default 0.0 = dump EVERY captured frame, so at --fps 30 you get 30 "
+        "PNG/s (matching the mp4). Set e.g. 1.0 to throttle to one PNG/s. The "
+        "full stereo stream still lives in the SVO/mp4.",
     )
     p.add_argument(
         "--eye", choices=("left", "right"), default="right",
