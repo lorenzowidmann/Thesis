@@ -444,23 +444,21 @@ def compare_sensors(args):
         sys.exit("Need at least 2 poses per sensor to have an inter-pose gap.")
 
     names = [name for name, _ in sensors]
-    print("Inter-pose gap = seconds from one pose's END to the next pose's START")
+    print("Pose duration = seconds each pose lasts (END - START)")
     print("(relative within each sensor, so different clocks do not matter).")
     print()
-    header = f"{'gap':>7}  " + "  ".join(f"{nm:>8}" for nm in names) + "   | maxdiff"
+    header = f"{'pose':>4}  " + "  ".join(f"{nm:>8}" for nm in names) + "   | maxdiff"
     print(header)
     print("-" * len(header))
-    for i in range(n - 1):
-        gaps = []
-        for _, iv in sensors:
-            gaps.append(iv[i + 1][0] - iv[i][1])
-        maxdiff = max(gaps) - min(gaps)
-        cells = "  ".join(f"{g:7.1f}s" for g in gaps)
-        print(f"{i + 1:>3}->{i + 2:<2}  {cells}   | {maxdiff:6.1f}s")
+    for i in range(n):
+        durs = [iv[i][1] - iv[i][0] for _, iv in sensors]
+        maxdiff = max(durs) - min(durs)
+        cells = "  ".join(f"{d:7.1f}s" for d in durs)
+        print(f"{i + 1:>4}  {cells}   | {maxdiff:6.1f}s")
     print()
-    print("NOTE: large maxdiff on a row = the sensors disagree on that interval, "
-          "usually a missed/extra pose in one stream. Tune per-sensor detection "
-          "with --threshold / --mad-k / --min-duration.")
+    print("NOTE: large maxdiff on a row = the sensors disagree on that pose's "
+          "length, usually a missed/extra/merged pose in one stream. Tune "
+          "per-sensor detection with --threshold / --mad-k / --min-duration.")
 
 
 def image_profile(files, dirs, args):
