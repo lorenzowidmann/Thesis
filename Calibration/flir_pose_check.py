@@ -136,9 +136,10 @@ def detect_holes(gray, hole_kernel, min_area, max_area, min_circ, rect_tol):
         (x, y), r = cv2.minEnclosingCircle(c)
         if r <= 0:
             continue
-        if area / (np.pi * r * r) < min_circ:  # circularity
+        circ = area / (np.pi * r * r)
+        if circ < min_circ:
             continue
-        cand.append((area, x, y))
+        cand.append((area, x, y, circ))
     return select_holes(cand, rect_tol)
 
 
@@ -166,32 +167,64 @@ def _rect_score(p):
 
 
 def select_holes(cand, rect_tol):
-    """Pick the 4 candidate blobs that best form a centred rectangle (the holes).
-    Returns (pts(4,2), centre(2,)) or None if no plausible set is found."""
-    import itertools
-    if len(cand) < 4:
-        return None
-    cand = sorted(cand, key=lambda t: -t[0])[:8]  # keep the 8 strongest
-    areas = np.array([a for a, _, _ in cand], dtype=float)
-    pts_all = np.array([[x, y] for _, x, y in cand], dtype=np.float32)
+    """Pick the board holes and return (pts(4,2), centre(2,)) or None.
 
-    best = None  # (score, pts)
-    for idx in itertools.combinations(range(len(cand)), 4):
-        ii = list(idx)
+    The holes are the roundest blobs (not the largest), so candidates are ranked
+    by circularity. First try to find 4 that form a centred rectangle; if a hole
+    is missing (weak thermal contrast in some poses), reconstruct the 4th from 3
+    that form a right angle -- the four holes are the corners of a rectangle.
+    """
+    import itertools
+    if len(cand) < 3:
+        return None
+    cand = sorted(cand, key=lambda t: -t[3])[:8]  # by circularity, keep top 8
+    areas = np.array([a for a, _, _, _ in cand], dtype=float)
+    pts_all = np.array([[x, y] for _, x, y, _ in cand], dtype=np.float32)
+    n = len(cand)
+
+    def area_ok(ii):
         aa = areas[ii]
-        if aa.max() / max(aa.min(), 1e-6) > 3.0:   # holes are similar-sized
+        return aa.max() / max(aa.min(), 1e-6) <= 3.5
+
+    # --- 4 real holes forming a centred rectangle ---
+    best = None
+    for idx in itertools.combinations(range(n), 4):
+        ii = list(idx)
+        if not area_ok(ii):
             continue
         p = pts_all[ii]
         if p.std(axis=0).max() < 4.0:              # too tightly clustered = noise
             continue
-        score = _rect_score(p)
-        if best is None or score < best[0]:
-            best = (score, p)
+        s = _rect_score(p)
+        if best is None or s < best[0]:
+            best = (s, p)
+    if best is not None and best[0] <= rect_tol:
+        return best[1], best[1].mean(axis=0)
 
-    if best is None or best[0] > rect_tol:
-        return None
-    p = best[1]
-    return p, p.mean(axis=0)
+    # --- fallback: 3 holes -> reconstruct the 4th at the right-angle corner ---
+    best3 = None
+    for idx in itertools.combinations(range(n), 3):
+        ii = list(idx)
+        if not area_ok(ii):
+            continue
+        p3 = pts_all[ii]
+        for vtx in range(3):
+            o = [j for j in range(3) if j != vtx]
+            va = p3[o[0]] - p3[vtx]
+            vb = p3[o[1]] - p3[vtx]
+            la, lb = float(np.linalg.norm(va)), float(np.linalg.norm(vb))
+            if la < 6 or lb < 6:
+                continue
+            if abs(float(va @ vb)) / (la * lb) > 0.25:   # sides not ~perpendicular
+                continue
+            p4 = p3[o[0]] + p3[o[1]] - p3[vtx]           # reflect vertex
+            quad = np.array([p3[0], p3[1], p3[2], p4], dtype=np.float32)
+            s = _rect_score(quad)
+            if best3 is None or s < best3[0]:
+                best3 = (s, quad)
+    if best3 is not None and best3[0] <= rect_tol:
+        return best3[1], best3[1].mean(axis=0)
+    return None
 
 
 def _scan_edge(gray, cx, cy, dx, dy, i0, drop, run=3):
@@ -292,8 +325,9 @@ def main():
                     help="Min hole blob area in px (default 100).")
     ap.add_argument("--hole-max-area", type=float, default=3000.0,
                     help="Max hole blob area in px (default 3000).")
-    ap.add_argument("--hole-min-circ", type=float, default=0.6,
-                    help="Min hole circularity (default 0.6).")
+    ap.add_argument("--hole-min-circ", type=float, default=0.45,
+                    help="Min hole circularity gate (default 0.45); the 4 holes "
+                         "are then chosen by circularity + rectangle geometry.")
     ap.add_argument("--rect-tol", type=float, default=0.35,
                     help="Max 'rectangle score' for the 4 holes: lower rejects "
                          "spurious/asymmetric sets more aggressively (default 0.35).")
