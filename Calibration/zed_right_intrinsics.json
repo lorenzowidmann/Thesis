@@ -3,14 +3,14 @@
   "eye": "right",
   "camera_matrix": [
     [
-      701.0134647141914,
+      1413.568264226983,
       0.0,
-      670.481095792303
+      1011.189566340403
     ],
     [
       0.0,
-      704.6331039305591,
-      376.29497265319304
+      1415.7896761688348,
+      569.2261621523027
     ],
     [
       0.0,
@@ -19,11 +19,11 @@
     ]
   ],
   "dist_coeffs": [
-    -0.15916986708762315,
-    -0.004596833074937014,
-    0.0005737602704078671,
-    -6.3088277409765e-06,
-    0.02063246826117106
+    -0.14379360033189428,
+    -0.05288220124639543,
+    0.0007518720487062219,
+    0.0004924650037456005,
+    0.07432985861341052
   ],
   "dist_coeff_order": [
     "k1",
@@ -32,81 +32,91 @@
     "p2",
     "k3"
   ],
-  "fx": 701.0134647141914,
-  "fy": 704.6331039305591,
-  "cx": 670.481095792303,
-  "cy": 376.29497265319304,
+  "fx": 1413.568264226983,
+  "fy": 1415.7896761688348,
+  "cx": 1011.189566340403,
+  "cy": 569.2261621523027,
   "image_size": {
-    "width": 1280,
-    "height": 720
+    "width": 1920,
+    "height": 1080
   },
   "reprojection_error": {
-    "mean_px": 0.21632840647901058,
-    "rms_px": 0.24641430971555203,
-    "worst_px": 0.6463570337317758,
+    "mean_px": 0.25528326158050096,
+    "rms_px": 0.27279964511358346,
+    "worst_px": 0.5222128480918304,
     "per_image_px": {
-      "right_001.png": 0.1455903220448299,
-      "right_002.png": 0.16196345613917765,
-      "right_003.png": 0.15241463532225213,
-      "right_004.png": 0.2449200494749917,
-      "right_005.png": 0.256279969074178,
-      "right_006.png": 0.6463570337317758,
-      "right_007.png": 0.3685358383594187,
-      "right_008.png": 0.2855099109219901,
-      "right_009.png": 0.1490122813323181,
-      "right_010.png": 0.18844263272922127,
-      "right_011.png": 0.2047765583112553,
-      "right_012.png": 0.306917081432316,
-      "right_013.png": 0.1597746943932404,
-      "right_014.png": 0.1881690283887489,
-      "right_015.png": 0.16861682677362586,
-      "right_016.png": 0.12234167131184169,
-      "right_017.png": 0.12444365517259483,
-      "right_018.png": 0.14096452821078265,
-      "right_019.png": 0.13439080040100523,
-      "right_020.png": 0.17714715605464712
+      "right_047.png": 0.18288863058461174,
+      "right_048.png": 0.10043795125058183,
+      "right_049.png": 0.26319721904858645,
+      "right_050.png": 0.21134364716512044,
+      "right_051.png": 0.2323007681425391,
+      "right_052.png": 0.15843686205345522,
+      "right_053.png": 0.16175944477290224,
+      "right_054.png": 0.23039038438230022,
+      "right_055.png": 0.5085810433771545,
+      "right_056.png": 0.2154126538527679,
+      "right_057.png": 0.29555406424755865,
+      "right_058.png": 0.5222128480918304,
+      "right_059.png": 0.1777867774425962,
+      "right_060.png": 0.27437614958578765,
+      "right_061.png": 0.23103200357272977,
+      "right_062.png": 0.184411513733024,
+      "right_063.png": 0.2470118817402699,
+      "right_064.png": 0.2618817983142281,
+      "right_065.png": 0.2465292423619804,
+      "right_066.png": 0.2287744399938754,
+      "right_067.png": 0.42241062293364195,
+      "right_068.png": 0.28082778347757925,
+      "right_069.png": 0.2616523309053184,
+      "right_070.png": 0.2529844031045051,
+      "right_071.png": 0.22988707537757982
     }
   },
   "checkerboard": {
     "inner_corners": [
-      5,
-      3
+      8,
+      6
     ],
-    "square_size_m": 0.0445
+    "square_size_m": 0.025
   },
   "images": {
-    "n_used": 20,
+    "n_used": 25,
     "n_skipped": 0,
     "used": [
-      "right_001.png",
-      "right_002.png",
-      "right_003.png",
-      "right_004.png",
-      "right_005.png",
-      "right_006.png",
-      "right_007.png",
-      "right_008.png",
-      "right_009.png",
-      "right_010.png",
-      "right_011.png",
-      "right_012.png",
-      "right_013.png",
-      "right_014.png",
-      "right_015.png",
-      "right_016.png",
-      "right_017.png",
-      "right_018.png",
-      "right_019.png",
-      "right_020.png"
+      "right_047.png",
+      "right_048.png",
+      "right_049.png",
+      "right_050.png",
+      "right_051.png",
+      "right_052.png",
+      "right_053.png",
+      "right_054.png",
+      "right_055.png",
+      "right_056.png",
+      "right_057.png",
+      "right_058.png",
+      "right_059.png",
+      "right_060.png",
+      "right_061.png",
+      "right_062.png",
+      "right_063.png",
+      "right_064.png",
+      "right_065.png",
+      "right_066.png",
+      "right_067.png",
+      "right_068.png",
+      "right_069.png",
+      "right_070.png",
+      "right_071.png"
     ],
     "skipped": []
   },
   "provenance": {
     "tool": "zed_intrinsic_calib.py",
-    "generated_utc": "2026-07-25T09:25:19+00:00",
+    "generated_utc": "2026-07-30T09:56:07+00:00",
     "opencv_version": "5.0.0",
     "python_version": "3.13.14",
-    "image_dir": "C:\\Users\\loren\\Desktop\\Calibrazione\\Intrinseca\\ZedCaptures",
-    "command": "zed_intrinsic_calib.py --image-dir C:\\Users\\loren\\Desktop\\Calibrazione\\Intrinseca\\ZedCaptures --checkerboard-size 5 3 --square-size 0.0445 --lvt2calib-export zed_right_intrinsic.yaml"
+    "image_dir": "C:\\Users\\loren\\Desktop\\SmallCheck1080p - 25 mm",
+    "command": "zed_intrinsic_calib.py --image-dir C:\\Users\\loren\\Desktop\\SmallCheck1080p - 25 mm --checkerboard-size 8 6 --square-size 0.025"
   }
 }
