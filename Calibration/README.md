@@ -31,8 +31,9 @@ pip3 install -r requirements.txt
 ```
 
 `opencv-python` and `numpy` cover everything except thermal RJPG decoding,
-which needs `flyr` (already a `RadiometricCalibration` dependency). No ZED SDK,
-no CUDA, no `pyzed`, no scipy.
+which needs `flyr` (already a `RadiometricCalibration` dependency). The two bag
+tools add `rosbags` (pure Python, no ROS install) and, for the MATLAB hand-off
+only, `scipy.io.savemat`. No ZED SDK, no CUDA, no `pyzed`.
 
 Check whether you even need to install:
 
@@ -362,6 +363,88 @@ the board frame. That consistent flip is equivalent to viewing the board from
 its far side and is likewise absorbed by `R` — verified against synthetic
 truth, both windings recovering fx within 0.3%.
 
+## Bag rate check — `check_bag_rate.py`
+
+Extrinsic calibration records the LiDAR while the board is held still in a
+series of poses. Before averaging those scans, check the bag actually kept the
+rate, and how many scans each pose really got:
+
+```bash
+py check_bag_rate.py --bag rosbag2_2026_07_30-15_02_17            # every topic
+py check_bag_rate.py --bag BAG --topic /livox/lidar --expected-hz 5 \
+    --windows 1:109 111:221 247:350 352:461
+```
+
+Windows are `START:END` in seconds from the topic's first message
+(`--time-origin bag` to count from the bag start instead). `--output` writes the
+same report as provenance-tracked JSON; with `--expected-hz` the exit status is
+1 when any rate falls outside `--tolerance`, so it can gate a script.
+
+Two rate columns, and the gap between them is the point:
+
+- `rate_hz` — messages per second of wall time. Per window this is
+  `count / (end - start)`, so a pose emptied by a drop reads low.
+- `median_hz` — from the median interval, which ignores gaps. This is the rate
+  the sensor was *running* at.
+
+`rate_hz << median_hz` therefore means dropped messages, not a slow sensor;
+`missing` estimates how many, counting each gap longer than 3 median intervals.
+
+Measured on `Extr_tryN`: `/livox/lidar` records at a median 5.00 Hz but a mean
+4.72 Hz over 1376 s — 25 gaps, ~63 scans lost (~1%), spread across the poses.
+Note that is 5 Hz, not the driver's default 10 Hz.
+
+Timestamps are the bag's **receive** times, not message header stamps: reading
+them costs nothing, whereas header stamps would mean deserialising every
+`CustomMsg` in a multi-GB bag. Receive time is also the clock that shows scans
+lost between sensor and disk.
+
+Needs `rosbags` (in `requirements.txt`) — a pure-Python reader, no ROS install.
+
+## Looking at the LiDAR bag — `export_livox_cloud.py`
+
+The extrinsic bags record `/livox/lidar` as `livox_ros_driver2/msg/CustomMsg`,
+which MATLAB's `ros2bagreader` **lists but cannot deserialise**: custom messages
+need `ros2genmsg` and a C++ toolchain first, and these bags store an empty
+message definition, so nothing can recover the layout from the file alone.
+`PlayCloudBuild.m` therefore fails on them with
+
+```
+Il topic /livox/lidar e' di tipo livox_ros_driver2/CustomMsg, non sensor_msgs/PointCloud2.
+```
+
+Decode it here instead and hand MATLAB a `.mat`:
+
+```bash
+py export_livox_cloud.py --bag BAG --output frames.mat --step 50 --voxel 0.05
+py export_livox_cloud.py --bag BAG --output pose1.mat --start 1 --end 109 --step 5
+py export_livox_cloud.py --bag BAG --output frames.mat --ply cloud.ply   # CloudCompare
+```
+```matlab
+PlayCloudBuild('frames.mat')
+```
+
+Use `check_bag_rate.py --windows` to get the pose windows, then `--start/--end`
+to export one pose at a time.
+
+The `.mat` holds the frames concatenated (`xyz`) plus `counts` and `stamps`, so
+the player can rebuild them one at a time. `--voxel` decimates each scan on the
+way out (first point per cell, not the average — MATLAB re-grids anyway); a
+90k-point Mid-360 scan drops to ~26k at 5 cm.
+
+Decoding is a direct numpy read of the CDR buffer, not a generic deserialiser:
+the point array is a fixed 20-byte stride, so one `frombuffer` replaces 90k
+Python objects per scan. Verified bit-identical to `rosbags.deserialize_cdr`
+over this bag, and ~120x faster. Two details that layout depends on: CDR
+alignment counts from the start of the payload, *after* the 4-byte encapsulation
+header, and the final array element is written without its trailing pad byte.
+
+**These points are in the sensor frame.** No SLAM pose is applied and none is
+needed — during extrinsic calibration the LiDAR is bolted down and only the
+board moves, so accumulating frames thickens one static scene and shows the
+board jumping between poses. It will not build up like a `/cloud_registered`
+bag, which FAST-LIO has already registered into a map frame.
+
 ## Structure
 
 ```
@@ -369,6 +452,8 @@ Calibration/
 ├── capture_zed_right.py     # live capture: keypress -> right-eye PNG
 ├── zed_intrinsic_calib.py   # ZED right eye: images -> K + distortion
 ├── flir_intrinsic_calib.py  # FLIR thermal: 4-hole board -> K (no distortion)
+├── check_bag_rate.py        # rosbag2 QA: recording Hz, overall and per pose
+├── export_livox_cloud.py    # Livox CustomMsg -> .mat / .ply (MATLAB can't read it)
 ├── requirements.txt
 ├── ZedCaptures/             # captured frames (gitignored)
 └── README.md

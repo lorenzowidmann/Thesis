@@ -137,7 +137,7 @@ mapVoxel = 0.05;    % m
 % Esempi: [-Inf Inf, -Inf Inf, -Inf 2.5] taglia solo sopra i 2.5 m
 %         [0 40, -5 15, -Inf Inf]        isola un tratto in pianta
 useMapROI = true;
-mapROI = [-Inf Inf, ...     % X min max
+mapROI = [-Inf 42, ...     % X min max
           -Inf Inf, ...     % Y min max
           -1 4];        % Z min max
 
