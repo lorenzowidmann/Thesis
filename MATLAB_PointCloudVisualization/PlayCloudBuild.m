@@ -29,7 +29,7 @@ close all
 clc
 
 %% 1. Parametri
-bagPath    = 'C:\Users\loren\Desktop\Dati_vfinal\Calibration\Extr_tryN\Lidar\extr_tryN_frames.mat';
+bagPath    = 'C:\Users\loren\Desktop\Dati_vfinal\SLAM\Lidar\rosbag2_2026_07_30-18_12_20';
 topicName  = '/cloud_registered';
 
 % Gli argomenti, se passati, hanno la precedenza sui default qui sopra.

@@ -3,3 +3,4 @@ numpy
 flyr  # radiometric JPEG (RJPG) decoding, thermal only -- flir_intrinsic_calib.py
 rosbags  # ROS 2 bag reading, no ROS install needed -- check_bag_rate.py, export_livox_cloud.py
 scipy  # savemat only, for the MATLAB hand-off -- export_livox_cloud.py
+pyyaml  # rig_calibration.yaml loader -- rig_calibration.py

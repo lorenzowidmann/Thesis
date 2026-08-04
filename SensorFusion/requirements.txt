@@ -11,3 +11,7 @@ flyr            # FLIR radiometric-JPEG reader (also used in RadiometricCalibrat
 rosbags         # LiDAR rosbag2 /Odometry reader (also used in PointCloudView)
 Pillow          # FLIR EXIF timestamps + ZED PNG display
 matplotlib      # Stage-1 steppable event-sync viewer
+
+# ../EmissivityCalculation/project_to_flir.py (uses this venv for its LiDAR
+# bag + rosbags + opencv needs; loads Calibration/rig_calibration.yaml)
+pyyaml

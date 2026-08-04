@@ -6,8 +6,21 @@ development), tiled into a grid of cells, each cell classified independently
 with CLIP zero-shot image classification, and its emissivity looked up in a
 table of tabulated values (`emissivity_table.csv`).
 
-No viewing-angle correction is applied here — tabulated normal emissivity only
-(surface geometry will be handled separately with lidar data).
+Two ways to run it:
+- **`main.py`** — single live/still frame, coarse NxN grid. Good for
+  development and spot checks (see Usage below).
+- **`classify_session.py` + `project_to_flir.py`** — a recorded session
+  (FLIR+ZED+LiDAR, synced by `../SensorFusion/sync_manifest.py`), fine-grained
+  SLIC superpixels instead of a fixed grid, and the material/emissivity map
+  projected onto *real FLIR pixels* via LiDAR (no direct FLIR<->ZED
+  calibration needed — see "Session pipeline" below). This is what actually
+  answers "what material and emissivity is in each zone of the FLIR image."
+
+No viewing-angle-dependent emissivity correction is applied by either path —
+both use tabulated *normal* emissivity only. The session pipeline does now
+place that value geometrically on FLIR pixels (via LiDAR), which viewing-angle
+correction would build on top of, but computing the angle itself (surface
+normal vs. camera ray, from LiDAR) is still not implemented.
 
 ## Setup
 
@@ -95,6 +108,62 @@ Row  Col  Material            Confidence  Emissivity
 Best estimate: brick (row 0, col 0) -> emissivity = 0.93 (91%)
 ```
 
+## Session pipeline (real FLIR pixels, via LiDAR fusion)
+
+Two steps, two different venvs (see below for why):
+
+```powershell
+# 1. Material + emissivity per SLIC superpixel, on the ZED frame of every
+#    (or --every-n Nth / --limit first-N) synced triplet. Uses the
+#    `emissivity` venv (torch/transformers/scikit-image).
+C:\venvs\emissivity\Scripts\python.exe classify_session.py `
+    --session-dir path\to\ZED\<session>\fullrate `
+    --n-segments 100 --overlay
+
+# 2. Project that material map onto FLIR's own pixel grid via LiDAR (reads
+#    /cloud_registered from the rosbag2, needs `rosbags` -- uses the
+#    `sensorfusion` venv instead, no torch/CLIP dependency at this step,
+#    it only reads step 1's saved output).
+C:\venvs\sensorfusion\Scripts\python.exe project_to_flir.py `
+    --session-dir path\to\ZED\<session>\fullrate `
+    --bag path\to\Lidar\<bag-folder> --overlay
+```
+
+`--session-dir` must point at a ZED session folder that already has
+`sync_manifest.json` (from `../SensorFusion/sync_manifest.py`) — that's what
+drives which frames get processed and supplies each frame's LiDAR pose.
+
+**Why LiDAR, not a direct FLIR<->ZED calibration:** no FLIR<->ZED extrinsic
+exists (or is needed). Instead, `../Calibration/rig_calibration.yaml` holds
+LiDAR<->FLIR and LiDAR<->ZED extrinsics (from the LVT2Calib board-pose
+session, RMSE ~6cm) plus both cameras' intrinsics. For every LiDAR point
+visible in *both* camera frustums, `project_to_flir.py` reads its material
+off the ZED-side classification and writes it at that point's own FLIR
+pixel — LiDAR is the bridge between the two image planes.
+
+**Read the coverage number.** LiDAR's point density inside FLIR's narrow
+32x26 deg FOV is far below FLIR's 86k pixels — expect single-digit percent
+direct coverage (`stats.json`'s `coverage_pct`, ~6-7% in the one session
+tested so far). Everything else is a plain nearest-neighbor fill;
+`sampled_mask.npy` keeps the direct/interpolated distinction per pixel so
+that split is never hidden downstream.
+
+**Known rough edges:**
+- Low-emissivity materials (e.g. `steel_polished`, e=0.07) make
+  `RadiometricCalibration/main.py`'s correction numerically touchy (dividing
+  by a small ε amplifies noise) — expect implausible outlier temperatures on
+  metal/radiator zones specifically, not a sign the rest of the map is wrong.
+- Extrinsic RMSE (~6cm both pairs) is fine for zone-level analysis, not
+  precise pixel-perfect edges, especially at the corridor's far end (angular
+  error amplifies with distance).
+- FLIR frames must be rotated 180 deg before use (camera is mounted upside
+  down; the LiDAR<->FLIR extrinsic was derived on rotated images) — see
+  `rig_calibration.yaml`'s `flir.rotated_180_before_calibration` flag and
+  `../SensorFusion`'s already-rotated `*_rot180/*.npy` Celsius frames for the
+  convention to follow.
+- `rig_calibration.yaml` is the single place to update when a calibration is
+  redone — nothing downstream hardcodes numbers.
+
 ## Adding materials
 
 Add a row to `emissivity_table.csv`:
@@ -136,12 +205,20 @@ or rectified stereo. Requires:
 
 ```
 EmissivityCalculation/
-├── main.py                  # CLI entry point
+├── main.py                  # CLI entry point (single frame, NxN grid)
+├── classify_session.py      # CLI: session pipeline step 1 (SLIC + CLIP per triplet)
+├── project_to_flir.py       # CLI: session pipeline step 2 (LiDAR-mediated fusion onto FLIR pixels)
 ├── emissivity_table.csv     # tabulated emissivity values + CLIP prompts
 ├── emissivity/
 │   ├── table.py             # EmissivityTable: CSV loading + lookup
-│   ├── classifier.py        # MaterialClassifier: CLIP zero-shot
+│   ├── classifier.py        # MaterialClassifier: CLIP zero-shot (classify + classify_batch)
+│   ├── segmentation.py      # SLIC superpixel segmentation (skimage)
 │   └── sources.py           # ImageSource / WebcamSource / ZedSource / ZedUvcSource
 ├── test_images/             # sample images for development
 └── requirements.txt
+
+../Calibration/              # used by project_to_flir.py, not part of this module
+├── rig_calibration.yaml     # canonical FLIR/ZED intrinsics + LiDAR extrinsics (edit here)
+├── rig_calibration.py       # loader
+└── projection.py            # generic LiDAR -> camera pixel projection
 ```
