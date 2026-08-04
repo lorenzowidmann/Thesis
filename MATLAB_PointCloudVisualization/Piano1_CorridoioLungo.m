@@ -16,7 +16,7 @@ topicName  = '/cloud_registered';
 
 frameStep  = 1;      % 1 = tutti i frame. Alzare (es. 5) se la memoria non basta.
 maxFrames  = Inf;    % limite di frame da leggere, Inf = nessun limite
-voxelSize  = 0.01;   % m, dimensione voxel per il downsampling. 0 = disattivato
+voxelSize  = 0.1;   % m, dimensione voxel per il downsampling. 0 = disattivato
 markerSize = 20;     % dimensione dei punti a schermo. Il default di pcshow e' piccolo
 
 %% 2. Apertura bag
