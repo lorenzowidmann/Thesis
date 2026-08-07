@@ -56,6 +56,13 @@ from projection import project_lidar_to_camera
 from rig_calibration import load_rig_calibration
 from project_to_flir import nearest_clouds_for_targets
 
+# zones.py is imported by path rather than as emissivity.zones: the package
+# __init__ pulls in table.py (pandas) and classifier.py (torch), neither of
+# which exists in the rosbags venv this script runs under. zones.py itself has
+# no imports at all.
+sys.path.insert(0, str(Path(__file__).resolve().parent / "emissivity"))
+from zones import ZONE_CANDIDATES, restrict_ranking  # noqa: E402
+
 DEFAULT_TABLE = Path(__file__).resolve().parent / "emissivity_table.csv"
 
 
@@ -75,6 +82,27 @@ def parse_args():
                     help="Voxel edge in metres (default 0.20). Must exceed the registration "
                          "error: composing the two LiDAR<->camera extrinsics is ~9 cm RMSE "
                          "before SLAM drift, so do not go below ~0.15.")
+    p.add_argument("--respect-zones", action=argparse.BooleanOptionalAction, default=True,
+                    help="Re-apply classify_session.py's geometric prior to the pooled votes "
+                         "(default on). A voxel pools views whose segments had different zones, "
+                         "so without this the consensus can hand a wall a floor material.")
+    p.add_argument("--min-emissivity", type=float, default=0.5, metavar="E",
+                    help="Floor on emissivity for segments whose zone carries no categorical "
+                         "list (default 0.5). Same role as classify_session.py's "
+                         "--low-emissivity-max.")
+    p.add_argument("--min-agreement", type=float, default=0.5, metavar="F",
+                    help="Only override a segment's own material when at least this fraction "
+                         "of its pooled vote mass backs the winner (default 0.6). Below it the "
+                         "per-frame call is kept: a thin majority is not evidence.")
+    p.add_argument("--min-vote-confidence", type=float, default=0.5, metavar="C",
+                    help="Drop individual votes below this confidence before pooling "
+                         "(default 0.5). Measured by split-half reproducibility -- consensus "
+                         "built on even vs odd frames -- agreement rises 69.3%% -> 73.1%% while "
+                         "voxel coverage only falls to 96%%. 0 disables.")
+    p.add_argument("--depth-power", type=float, default=0.0, metavar="P",
+                    help="Vote weight is confidence * (1/depth)**P (default 0.0 = ignore "
+                         "distance). Measured: P=0 reproduces better than P=0.5 at every "
+                         "confidence floor, so weighting by proximity only added variance.")
     p.add_argument("--material-map-dir", default=None, metavar="DIR")
     p.add_argument("--emissivity-map-dir", default=None, metavar="DIR")
     p.add_argument("--out-dir", default=None, metavar="DIR",
@@ -129,6 +157,7 @@ def stage_vote(args, cal, session_dir, triplets):
     votes = defaultdict(Counter)        # voxel -> material -> weight
     hits = {}                           # stem -> {segment id -> Counter(voxel)}
     n_votes = 0
+    n_weak_votes = 0
 
     for triplet, cloud in zip(work, clouds):
         stem = Path(triplet["flir"]["file"]).stem
@@ -157,9 +186,13 @@ def stage_vote(args, cal, session_dir, triplets):
             if sid < 0 or sid not in info:
                 continue
             material, conf = info[sid]
-            # Closer looks count more: the same surface at 2 m gives CLIP a far
-            # better crop than at 12 m.
-            weight = conf / max(1.0, float(dep[k]))
+            # A near-tie CLIP call is a coin flip, and letting it vote only adds
+            # noise: dropping votes below --min-vote-confidence raises split-half
+            # reproducibility from 69.3% to 73.1% while keeping 96% of voxels.
+            if conf < args.min_vote_confidence:
+                n_weak_votes += 1
+                continue
+            weight = conf * (1.0 / max(1.0, float(dep[k]))) ** args.depth_power
             key = (int(vox[k, 0]), int(vox[k, 1]), int(vox[k, 2]))
             votes[key][material] += weight
             per_seg[sid][key] += 1
@@ -172,7 +205,8 @@ def stage_vote(args, cal, session_dir, triplets):
 
     consensus = {k: c.most_common(1)[0][0] for k, c in votes.items()}
     n_materials = np.array([len(c) for c in votes.values()])
-    print(f"{n_votes} votes -> {len(votes)} voxels")
+    print(f"{n_votes} votes -> {len(votes)} voxels "
+          f"({n_weak_votes} votes dropped below confidence {args.min_vote_confidence})")
     print(f"distinct materials proposed per voxel: mean {n_materials.mean():.2f}, "
           f"max {n_materials.max()}; {100.0 * (n_materials > 1).mean():.1f}% of voxels "
           f"got more than one")
@@ -181,7 +215,7 @@ def stage_vote(args, cal, session_dir, triplets):
     # own points fell in. Segments no LiDAR point reached keep their original
     # call -- there is nothing better to say about them.
     out_dir.mkdir(parents=True, exist_ok=True)
-    n_changed = n_total = n_orphan = 0
+    n_changed = n_total = n_orphan = n_weak = 0
     for triplet in work:
         stem = Path(triplet["flir"]["file"]).stem
         src = material_dir / stem
@@ -199,17 +233,46 @@ def stage_vote(args, cal, session_dir, triplets):
                 seg["consensus"] = {"status": "no_lidar_sample"}
                 n_orphan += 1
                 continue
+            # Pool the vote MASS of each voxel, not the voxel's hard winner.
+            # Summing winners is a second argmax on top of the per-voxel one: a
+            # voxel where painted_metal beat plaster 51-to-49 would contribute a
+            # full vote and discard the 49, which systematically amplifies
+            # whichever class is already most common. Measured before this fix:
+            # painted_metal +276 segments, concrete -178, and plaster / brick /
+            # wood / cardboard wiped out entirely.
             pooled = Counter()
             for key, count in voxels.items():
-                pooled[consensus[key]] += count
-            material = pooled.most_common(1)[0][0]
-            agree = pooled[material] / sum(pooled.values())
+                total = sum(votes[key].values()) or 1.0
+                for mat, weight in votes[key].items():
+                    pooled[mat] += count * weight / total
+
+            # Re-apply the geometric prior. classify_session.py enforces it
+            # per frame, but a voxel pools votes from segments that had
+            # DIFFERENT zones -- a voxel straddling the wall/floor junction
+            # collects floor votes, a voxel spanning a radiator and the ceiling
+            # above it collects painted_metal. Without this, 5.1% of overrides
+            # landed on a material the segment's own zone forbids (mostly
+            # "vertical -> rubber" and "ceiling -> painted_metal").
+            ranked = pooled.most_common()
+            if args.respect_zones:
+                ranked = restrict_ranking(ranked, seg.get("zone", "any"),
+                                          eps_of=eps_of, min_eps=args.min_emissivity)
+            material, best = ranked[0]
+            agree = best / (sum(p for _m, p in ranked) or 1.0)
             seg["consensus"] = {
                 "status": "ok",
                 "from_frame": seg["top_material"],
                 "n_voxels": len(voxels),
                 "agreement": round(agree, 3),
             }
+            # A thin majority is not evidence. Below --min-agreement the
+            # segment keeps what its own view decided, so consensus only
+            # overrides when the session as a whole is actually consistent.
+            if agree < args.min_agreement:
+                seg["consensus"]["status"] = "below_min_agreement"
+                seg["consensus"]["would_be"] = material
+                n_weak += 1
+                continue
             if material != seg["top_material"]:
                 n_changed += 1
             seg["top_material"] = material
@@ -219,8 +282,9 @@ def stage_vote(args, cal, session_dir, triplets):
         (dst / "segments.json").write_text(json.dumps(doc, indent=2), encoding="utf-8")
 
     print(f"materials replaced on {n_changed}/{n_total} segments "
-          f"({100.0 * n_changed / max(1, n_total):.1f}%); "
-          f"{n_orphan} had no LiDAR sample and kept their per-frame call")
+          f"({100.0 * n_changed / max(1, n_total):.1f}%)")
+    print(f"kept their per-frame call: {n_orphan} without LiDAR samples, "
+          f"{n_weak} below --min-agreement {args.min_agreement}")
     print(f"\nDone. Consensus material map in {out_dir}")
     print("Next: correct_session.py ... --material-map-dir "
           f"\"{out_dir}\"")
