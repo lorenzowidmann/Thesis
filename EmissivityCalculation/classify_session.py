@@ -15,12 +15,13 @@ PARTITION -- it emits ~n_segments cells whatever the content, so a uniform
 floor is split into dozens of cells that then get classified independently
 and disagree with each other.
 
-With --crop-to-flir-fov, only the part of the ZED frame the FLIR can actually
-see is segmented and classified. project_to_flir.py keeps solely the LiDAR
-points valid in BOTH cameras, so a superpixel outside the FLIR frustum can
-never reach a FLIR pixel -- on this rig that frustum is ~16% of the ZED frame,
-i.e. most of the CLIP calls were being discarded downstream. Cropping spends
-the same segment budget ~5x denser where it matters.
+Only the part of the ZED frame the FLIR can actually see is segmented and
+classified (--no-crop-to-flir-fov for the whole frame). project_to_flir.py
+keeps solely the LiDAR points valid in BOTH cameras, so a region outside the
+FLIR frustum can never reach a FLIR pixel -- on this rig that frustum is ~16%
+of the ZED frame, so most of the CLIP calls used to be discarded downstream.
+There is no direct FLIR<->ZED calibration, but both extrinsics live in the
+LiDAR frame and compose; see Calibration/projection.py::flir_fov_bbox_in_zed.
 
 Output per frame, under <out-dir>/<flir_frame_stem>/:
     labels.npy    -- int32 HxW superpixel-id raster, ZED pixel grid, always
@@ -40,11 +41,12 @@ never fired at all.
 
 Usage:
     py classify_session.py --session-dir ...\\ZED\\20260730_161223\\fullrate --limit 3 --overlay
-    py classify_session.py --session-dir ...\\fullrate --crop-to-flir-fov
+    py classify_session.py --session-dir ...\\fullrate --every-n 5
 
     # fast, lower quality (the pre-2026-08 behaviour):
     py classify_session.py --session-dir ...\\fullrate --segmenter slic \\
-        --clip-model openai/clip-vit-large-patch14 --no-zone-constraint
+        --clip-model openai/clip-vit-large-patch14 \\
+        --no-zone-constraint --no-crop-to-flir-fov
 """
 
 import argparse
@@ -119,16 +121,19 @@ def parse_args():
                          "the corrected temperature by more than ~1 degC. --no-zone-constraint "
                          "to disable. See emissivity/zones.py.")
     # --- crop to the FLIR field of view ----------------------------------
-    p.add_argument("--crop-to-flir-fov", action="store_true",
+    p.add_argument("--crop-to-flir-fov", action=argparse.BooleanOptionalAction, default=True,
                     help="Segment/classify only the part of the ZED frame the FLIR can see "
-                         "(~16%% of it on this rig). Everything outside is discarded by "
-                         "project_to_flir.py anyway.")
+                         "(~16%% of it on this rig; 26.5%% with the default margin). On by "
+                         "default: project_to_flir.py keeps only points valid in BOTH cameras, "
+                         "so everything outside is discarded downstream anyway, and cropping "
+                         "cuts a 107-frame session from ~3.9 h to ~2.3 h. "
+                         "--no-crop-to-flir-fov to segment the whole frame.")
     p.add_argument("--fov-margin-px", type=int, default=45, metavar="PX",
                     help="Pad the FLIR-FOV crop by this many ZED pixels (default 45). Covers "
                          "the error of composing the two LiDAR<->camera extrinsics.")
     p.add_argument("--calibration", default=None, metavar="YAML",
                     help="Rig calibration (default: ../Calibration/rig_calibration.yaml). "
-                         "Only read when --crop-to-flir-fov is set.")
+                         "Read whenever --crop-to-flir-fov is on, which is the default.")
     p.add_argument("--top-k", type=int, default=3, metavar="N",
                     help="How many (material, confidence) candidates to keep per segment (default 3).")
     p.add_argument("--table", default=None, help="Path to a custom emissivity CSV")
