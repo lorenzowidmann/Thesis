@@ -90,10 +90,13 @@ def parse_args():
                     help="Floor on emissivity for segments whose zone carries no categorical "
                          "list (default 0.5). Same role as classify_session.py's "
                          "--low-emissivity-max.")
-    p.add_argument("--min-agreement", type=float, default=0.5, metavar="F",
+    p.add_argument("--min-agreement", type=float, default=0.0, metavar="F",
                     help="Only override a segment's own material when at least this fraction "
-                         "of its pooled vote mass backs the winner (default 0.6). Below it the "
-                         "per-frame call is kept: a thin majority is not evidence.")
+                         "of its pooled vote mass backs the winner. Default 0.0 = always take "
+                         "the session's answer over a single view, however thin the majority. "
+                         "Raising it keeps the per-frame call where the session is genuinely "
+                         "split: 0.5 cuts reassignments from 31.2%% to 11.3%% of votable "
+                         "segments and holds back the drift toward the most common material.")
     p.add_argument("--min-vote-confidence", type=float, default=0.5, metavar="C",
                     help="Drop individual votes below this confidence before pooling "
                          "(default 0.5). Measured by split-half reproducibility -- consensus "
@@ -265,9 +268,10 @@ def stage_vote(args, cal, session_dir, triplets):
                 "n_voxels": len(voxels),
                 "agreement": round(agree, 3),
             }
-            # A thin majority is not evidence. Below --min-agreement the
-            # segment keeps what its own view decided, so consensus only
-            # overrides when the session as a whole is actually consistent.
+            # Below --min-agreement the segment keeps what its own view decided.
+            # Off by default: the session's pooled answer is taken over a single
+            # view even on a thin majority. Raise it to hold back near-ties --
+            # they are where the drift toward the most common material lives.
             if agree < args.min_agreement:
                 seg["consensus"]["status"] = "below_min_agreement"
                 seg["consensus"]["would_be"] = material
