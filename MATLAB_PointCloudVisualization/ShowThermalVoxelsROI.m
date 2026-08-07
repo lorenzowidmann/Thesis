@@ -3,14 +3,20 @@ clc
 close all
 
 %% Parametri
-plyPath = 'C:\Users\loren\Desktop\Dati_vfinal\SLAM\ZED\20260730_161223\fullrate\voxel_map\thermal_voxels.ply';
+% voxel_map            -> 20 cm (baseline, generato con voxel_consensus.py
+%                          --stage thermal --voxel 0.20)
+% voxel_map_15cm        -> 15 cm, stessa temperatura corretta, solo
+%                          riaggregata su voxel piu' piccoli (vedi il
+%                          comando in fondo a questo file per rigenerare
+%                          ad altre dimensioni)
+plyPath = 'C:\Users\loren\Desktop\Dati_vfinal\SLAM\ZED\20260730_161223\fullrate\voxel_map_15cm\thermal_voxels.ply';
 
 % ROI: [Xmin Xmax, Ymin Ymax, Zmin Zmax], in metri. Di default e' l'intera
-% estensione della nuvola (misurata su questo file), quindi lo script
+% estensione della nuvola (misurata sul file a 20 cm; a 15 cm l'estensione
+% e' la stessa, cambia solo quanti voxel ci sono dentro), quindi lo script
 % funziona subito; stringere i numeri per isolare un tratto.
-% Estensione reale: X [0.7 51.5]  Y [-14.5 4.7]  Z [-0.7 5.5]
 roi = [0.7 51.5, ...
-       -14.5 4.7, ...
+       -1.8 2, ...
        -0.7 5.5];
 
 markerSize = 20;
