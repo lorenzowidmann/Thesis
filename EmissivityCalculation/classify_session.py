@@ -1,11 +1,19 @@
-"""Material + emissivity per superpixel, for every frame of a recorded ZED
+"""Material + emissivity per region, for every frame of a recorded ZED
 session (driven by SensorFusion/sync_manifest.py's sync_manifest.json).
 
 This is the "smallest possible zone" version of main.py's 3x3 grid: each
-frame is segmented into SLIC superpixels (respecting real visual edges
-instead of a fixed grid), and every superpixel is classified independently
-with the same CLIP zero-shot classifier + emissivity_table.csv lookup
-already used elsewhere in this module.
+frame is segmented into regions that respect real visual edges instead of a
+fixed grid, and every region is classified independently with the same CLIP
+zero-shot classifier + emissivity_table.csv lookup already used elsewhere in
+this module.
+
+Segmentation defaults to SAM (Segment Anything), whose masks follow actual
+objects: on a corridor frame the floor comes out as ONE region and the
+radiators, pillars and window bays are separated, at 99% pixel coverage. SLIC
+remains available with --segmenter slic and is ~70x faster, but it is a
+PARTITION -- it emits ~n_segments cells whatever the content, so a uniform
+floor is split into dozens of cells that then get classified independently
+and disagree with each other.
 
 With --crop-to-flir-fov, only the part of the ZED frame the FLIR can actually
 see is segmented and classified. project_to_flir.py keeps solely the LiDAR
@@ -23,18 +31,16 @@ Output per frame, under <out-dir>/<flir_frame_stem>/:
                       (centroids in full-frame ZED pixels, cropped or not)
     overlay.png   -- optional (--overlay), superpixel boundaries + labels
 
-Segmenter and prior are both optional; defaults reproduce the historical
-behaviour exactly (SLIC, no zone constraint).
-
 Usage:
     py classify_session.py --session-dir ...\\ZED\\20260730_161223\\fullrate --limit 3 --overlay
     py classify_session.py --session-dir ...\\fullrate --every-n 5
-    py classify_session.py --session-dir ...\\fullrate --crop-to-flir-fov
 
     # best-quality configuration measured so far (~82 s/frame on CPU):
     py classify_session.py --session-dir ...\\fullrate --crop-to-flir-fov \\
-        --segmenter sam --zone-constraint \\
-        --clip-model laion/CLIP-ViT-H-14-laion2B-s32B-b79K
+        --zone-constraint --clip-model laion/CLIP-ViT-H-14-laion2B-s32B-b79K
+
+    # previous behaviour (fast, lower quality):
+    py classify_session.py --session-dir ...\\fullrate --segmenter slic
 """
 
 import argparse
@@ -81,9 +87,11 @@ def parse_args():
         help="Output root (default: <session-dir>/material_map).",
     )
     # --- segmenter ---------------------------------------------------------
-    p.add_argument("--segmenter", choices=("slic", "sam"), default="slic",
-                    help="slic (default, ~0.4 s/frame) or sam (~27 s/frame CPU, but masks "
-                         "follow real objects: the floor comes out as one region).")
+    p.add_argument("--segmenter", choices=("sam", "slic"), default="sam",
+                    help="sam (default): Segment Anything masks follow real objects -- the "
+                         "floor comes out as one region -- at ~27 s/frame on CPU. "
+                         "slic: ~0.4 s/frame, but it partitions the image into ~n_segments "
+                         "cells regardless of content, so uniform surfaces get shredded.")
     p.add_argument("--n-segments", type=int, default=100, metavar="N",
                     help="Target SLIC superpixel count per frame (default 100). slic only.")
     p.add_argument("--compactness", type=float, default=10.0,
