@@ -33,7 +33,14 @@ ZONE_CANDIDATES = {
     "ceiling": ["plaster", "paint", "concrete", "wood"],
     "vertical": ["plaster", "paint", "brick", "concrete", "glass", "wood",
                  "painted_metal", "plastic", "ceramic", "fabric"],
-    "any": None,        # no restriction
+    # No categorical prior for a region whose shape says nothing -- but "no
+    # prior" must not mean "anything goes". A region that matched none of the
+    # above previously got the full 20-class list, and ViT-H duly returned
+    # steel_polished at 0.53 with a 0.23 margin, which sails through the
+    # confidence gate: e=0.07, a ~150 degC region. So `any` still drops the
+    # classes whose emissivity would blow the correction up; see
+    # restrict_ranking's min_eps.
+    "any": None,
 }
 
 
@@ -59,7 +66,7 @@ def zone_of(segment: dict, image_height: int, image_width: int) -> str:
     return "any"
 
 
-def restrict_ranking(ranked, zone):
+def restrict_ranking(ranked, zone, eps_of=None, min_eps=0.5):
     """Drop candidates the zone forbids, renormalising the remaining scores.
 
     `ranked` is CLIP's full [(material, prob), ...] best-first. Restricting a
@@ -67,13 +74,21 @@ def restrict_ranking(ranked, zone):
     is exactly equivalent to having scored only the allowed classes -- no extra
     forward pass, no extra cost.
 
-    Falls back to the unrestricted ranking if the zone would leave nothing,
+    For a zone with no categorical list ("any"), candidates below `min_eps` are
+    still dropped when `eps_of` is supplied: no indoor surface this pipeline
+    sees is bare polished metal, and letting one through costs ~120 degC while
+    every ordinary confusion costs under 1 degC.
+
+    Falls back to the unrestricted ranking if the filter would leave nothing,
     so a table with unusual material names can never produce an empty result.
     """
     allowed = ZONE_CANDIDATES.get(zone)
-    if not allowed:
+    if allowed:
+        keep = [(m, p) for m, p in ranked if m in allowed]
+    elif eps_of is not None:
+        keep = [(m, p) for m, p in ranked if eps_of.get(m, 1.0) >= min_eps]
+    else:
         return ranked
-    keep = [(m, p) for m, p in ranked if m in allowed]
     if not keep:
         return ranked
     total = sum(p for _m, p in keep) or 1.0

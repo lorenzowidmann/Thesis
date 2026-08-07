@@ -229,6 +229,9 @@ def main():
 
     table = EmissivityTable(args.table) if args.table else EmissivityTable()
     classifier = MaterialClassifier(table, model_name=args.clip_model)
+    # Used by the zone prior to drop catastrophic candidates where the zone
+    # itself carries no categorical restriction.
+    eps_of = {m: table.lookup(m).emissivity for m in table.materials}
 
     # Loaded once: SAM's weights are ~375 MB and loading them per frame would
     # dominate the runtime.
@@ -326,7 +329,8 @@ def main():
             # Geometric prior first: the gate below then works on candidates
             # that are already possible for this kind of surface.
             if args.zone_constraint:
-                restricted = restrict_ranking(ranked, zone)
+                restricted = restrict_ranking(ranked, zone, eps_of=eps_of,
+                                              min_eps=args.low_emissivity_max)
                 if restricted is not ranked:
                     n_zoned += ranked[0][0] != restricted[0][0]
                     ranked = restricted
