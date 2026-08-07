@@ -16,6 +16,9 @@ Output per frame, under <out-dir>/<flir_stem>/:
     distance.npy       -- float32 HxW (FLIR grid), camera-frame depth in
                           metres from the same LiDAR samples, ready for
                           RadiometricCalibration/main.py --distance-map
+    segment_id.npy     -- int32 HxW, which ZED superpixel each FLIR pixel came
+                          from (-1 where unknown); lets correct_session.py
+                          revisit the material choice per segment
     sampled_mask.npy   -- bool HxW, True where a LiDAR point actually landed
                           (not interpolated)
     stats.json         -- n_points_in_scan, n_direct_samples, coverage_pct
@@ -209,9 +212,15 @@ def main():
         keep = np.isfinite(point_emissivity)
         emissivity_sparse = np.full((fh, fw), np.nan, dtype=np.float32)
         distance_sparse = np.full((fh, fw), np.nan, dtype=np.float32)
+        # Which ZED superpixel each FLIR pixel came from. Carried through so a
+        # later step (correct_session.py) can revisit the material decision
+        # per segment -- emissivity.npy alone is just floats, the link back to
+        # segments.json's alternative candidates would otherwise be lost.
+        segment_sparse = np.full((fh, fw), -1.0, dtype=np.float32)
         sampled_mask = np.zeros((fh, fw), dtype=bool)
         emissivity_sparse[flir_px[keep, 1], flir_px[keep, 0]] = point_emissivity[keep]
         distance_sparse[flir_px[keep, 1], flir_px[keep, 0]] = point_depth[keep]
+        segment_sparse[flir_px[keep, 1], flir_px[keep, 0]] = seg_ids[keep].astype(np.float32)
         sampled_mask[flir_px[keep, 1], flir_px[keep, 0]] = True
 
         n_direct = int(sampled_mask.sum())
@@ -221,11 +230,15 @@ def main():
 
         emissivity_full = nearest_fill(np.nan_to_num(emissivity_sparse), sampled_mask)
         distance_full = nearest_fill(np.nan_to_num(distance_sparse), sampled_mask)
+        # Nearest-fill on ids uses the same routine, then rounds back to int:
+        # ids are only ever copied from a sampled pixel, never averaged.
+        segment_full = np.rint(nearest_fill(segment_sparse, sampled_mask)).astype(np.int32)
 
         frame_dir = out_dir / stem
         frame_dir.mkdir(parents=True, exist_ok=True)
         np.save(frame_dir / "emissivity.npy", emissivity_full.astype(np.float32))
         np.save(frame_dir / "distance.npy", distance_full.astype(np.float32))
+        np.save(frame_dir / "segment_id.npy", segment_full)
         np.save(frame_dir / "sampled_mask.npy", sampled_mask)
         (frame_dir / "stats.json").write_text(json.dumps({
             "schema": "flir_emissivity_map/v1",
