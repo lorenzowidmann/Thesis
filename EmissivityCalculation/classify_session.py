@@ -31,16 +31,20 @@ Output per frame, under <out-dir>/<flir_frame_stem>/:
                       (centroids in full-frame ZED pixels, cropped or not)
     overlay.png   -- optional (--overlay), superpixel boundaries + labels
 
+Defaults are the best-quality configuration measured on this rig: SAM masks,
+CLIP ViT-H/14, and the geometric zone prior on. That prior matters more than it
+looks -- unconstrained on a full frame, ViT-H proposed a bare metal on 27% of
+regions and one survived the confidence gate at 0.79, which would have turned a
+37 degC reading into ~156 degC on that region. With the prior on, the gate
+never fired at all.
+
 Usage:
     py classify_session.py --session-dir ...\\ZED\\20260730_161223\\fullrate --limit 3 --overlay
-    py classify_session.py --session-dir ...\\fullrate --every-n 5
+    py classify_session.py --session-dir ...\\fullrate --crop-to-flir-fov
 
-    # best-quality configuration measured so far (~82 s/frame on CPU):
-    py classify_session.py --session-dir ...\\fullrate --crop-to-flir-fov \\
-        --zone-constraint --clip-model laion/CLIP-ViT-H-14-laion2B-s32B-b79K
-
-    # previous behaviour (fast, lower quality):
-    py classify_session.py --session-dir ...\\fullrate --segmenter slic
+    # fast, lower quality (the pre-2026-08 behaviour):
+    py classify_session.py --session-dir ...\\fullrate --segmenter slic \\
+        --clip-model openai/clip-vit-large-patch14 --no-zone-constraint
 """
 
 import argparse
@@ -107,11 +111,13 @@ def parse_args():
     p.add_argument("--sam-nms-iou", type=float, default=0.7, metavar="IOU",
                     help="Drop SAM masks overlapping a better one above this IoU (default 0.7).")
     # --- geometric prior ---------------------------------------------------
-    p.add_argument("--zone-constraint", action="store_true",
+    p.add_argument("--zone-constraint", action=argparse.BooleanOptionalAction, default=True,
                     help="Restrict CLIP's candidate materials by region geometry "
-                         "(floor/ceiling/vertical). Free -- reuses the same forward pass -- "
-                         "and makes a bare-metal call on an ordinary surface impossible. "
-                         "See emissivity/zones.py.")
+                         "(floor/ceiling/vertical). On by default: it is free -- it reuses the "
+                         "same forward pass -- and it makes a bare-metal call on an ordinary "
+                         "surface impossible, which is the only misclassification that changes "
+                         "the corrected temperature by more than ~1 degC. --no-zone-constraint "
+                         "to disable. See emissivity/zones.py.")
     # --- crop to the FLIR field of view ----------------------------------
     p.add_argument("--crop-to-flir-fov", action="store_true",
                     help="Segment/classify only the part of the ZED frame the FLIR can see "
@@ -141,8 +147,12 @@ def parse_args():
     p.add_argument("--no-gating", action="store_true",
                     help="Disable the low-emissivity gate (keep CLIP's raw top-1).")
     p.add_argument(
-        "--clip-model", default="openai/clip-vit-large-patch14",
-        help="HF CLIP model (default matches main.py: openai/clip-vit-large-patch14).",
+        "--clip-model", default="laion/CLIP-ViT-H-14-laion2B-s32B-b79K",
+        help="HF CLIP model. Default ViT-H/14 (LAION): on SAM masks it labels every radiator "
+             "painted_metal at 0.85-1.00 where ViT-L/14 said plaster/glass/brick at 0.25-0.61, "
+             "and its confidences are calibrated enough to be worth weighting by. Costs ~2.0 s "
+             "per region vs 0.8 s, and ~3.9 GB on first download. Use "
+             "openai/clip-vit-large-patch14 for the faster, weaker previous default.",
     )
     p.add_argument("--every-n", type=int, default=1, metavar="N",
                     help="Process every Nth triplet from sync_manifest.json (default 1 = all).")
