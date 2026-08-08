@@ -2,8 +2,10 @@ function ShowTemperatureCorrection(sessionDirIn, flirDirIn)
 %% Confronto interattivo temperatura apparente / corretta (sessione 9)
 % Mostra il frame FLIR della sessione e, puntando col mouse su un pixel,
 % legge la temperatura PRIMA della correzione radiometrica (il .npy grezzo
-% della camera, temperatura apparente) e DOPO (corrected_temperature.npy
-% prodotto da RadiometricCalibration\correct_session.py), con la differenza.
+% della camera, temperatura apparente) e DOPO (corrected_temperature_consensus.npy
+% prodotto da RadiometricCalibration\correct_session.py con i materiali del
+% consenso multi-vista di EmissivityCalculation\voxel_consensus.py --stage
+% vote), con la differenza.
 %
 % Stessa idea di RadiometricCalibration\ThermalData.py --show (hover per
 % leggere il valore sotto il cursore), ma qui i valori sono due e affiancati,
@@ -11,15 +13,10 @@ function ShowTemperatureCorrection(sessionDirIn, flirDirIn)
 %
 % Oltre alla temperatura, per il pixel puntato vengono mostrati anche i dati
 % che hanno determinato la correzione: emissivita' applicata, distanza LiDAR,
-% materiale scelto da CLIP e se quel pixel era un campione LiDAR diretto
-% oppure riempito per vicinanza (sampled_mask). Serve a capire subito se un
-% valore strano e' misurato o interpolato.
-%
-% Il terzo pannello mostra il frame ZED da cui tutto questo nasce: e' li' che
-% SLIC ritaglia i superpixel e CLIP classifica ogni ritaglio, quindi e' la
-% sorgente dell'emissivita' poi riproiettata su FLIR. Puntando un pixel FLIR
-% si evidenzia sul ZED il superpixel corrispondente (bbox = il crop visto da
-% CLIP, croce = centroide).
+% materiale di consenso (con l'accordo del voto, e se il consenso ha cambiato
+% idea rispetto alla singola vista) e se quel pixel era un campione LiDAR
+% diretto oppure riempito per vicinanza (sampled_mask). Serve a capire subito
+% se un valore strano e' misurato o interpolato.
 %
 % Comandi da tastiera:
 %   freccia dx / sx   frame successivo / precedente
@@ -42,6 +39,19 @@ clc
 sessionDir = 'C:\Users\loren\Desktop\Dati_vfinal\SLAM\ZED\20260730_161223\fullrate';
 flirDir    = 'C:\Users\loren\Desktop\Dati_vfinal\SLAM\Flir\session9_only_rot180';
 
+% Nome del file corretto da leggere in ogni emissivity_map\<stem>\ e cartella
+% dei materiali da cui viene il testo del readout ("segmento N = materiale").
+% Di default sono quelli prodotti dal consenso multi-vista (la pipeline
+% corrente): correctedName in emissivity_map\<stem>\ e' scritto da
+% correct_session.py --material-map-dir material_map_consensus, mentre
+% emissivity_used.npy / correction_report.json non hanno un nome
+% configurabile e vengono sempre sovrascritti dall'ultima run di
+% correct_session.py -- quindi vanno gia' letti insieme a questo file, non
+% al vecchio corrected_temperature.npy (che sul disco resta quello della
+% primissima run, single-view, e non e' piu' coerente con emissivity_used).
+correctedName = 'corrected_temperature_consensus.npy';
+materialDirName = 'material_map_consensus';
+
 % Gli argomenti, se passati, hanno la precedenza sui default qui sopra.
 if nargin >= 1 && ~isempty(sessionDirIn)
     sessionDir = sessionDirIn;
@@ -51,14 +61,16 @@ if nargin >= 2 && ~isempty(flirDirIn)
 end
 
 emisDir     = fullfile(sessionDir, 'emissivity_map');
-materialDir = fullfile(sessionDir, 'material_map');
-framesDir   = fullfile(sessionDir, 'frames');   % PNG ZED sorgenti
+materialDir = fullfile(sessionDir, materialDirName);
 
 if ~isfolder(emisDir)
     error('Cartella emissivity_map non trovata: %s', emisDir);
 end
 if ~isfolder(flirDir)
     error('Cartella FLIR non trovata: %s', flirDir);
+end
+if ~isfolder(materialDir)
+    warning('Cartella materiali non trovata: %s (il readout non mostrera'' i materiali)', materialDir);
 end
 
 %% 2. Elenco dei frame corretti
@@ -71,7 +83,7 @@ frames = struct('stem', {}, 'apparentPath', {}, 'correctedPath', {}, 'dir', {});
 for k = 1:numel(d)
     stem = d(k).name;                       % es. 20250906_233144_R
     frameDir = fullfile(emisDir, stem);
-    corrPath = fullfile(frameDir, 'corrected_temperature.npy');
+    corrPath = fullfile(frameDir, correctedName);
 
     % Il .npy FLIR grezzo non ha il suffisso _R del nome cartella.
     appPath = fullfile(flirDir, [strrep(stem, '_R', '') '.npy']);
@@ -85,15 +97,18 @@ for k = 1:numel(d)
 end
 
 if isempty(frames)
-    error('Nessun frame con correzione trovato in %s', emisDir);
+    error('Nessun frame con "%s" trovato in %s', correctedName, emisDir);
 end
 nFrames = numel(frames);
-fprintf('%d frame corretti in %s\n', nFrames, emisDir);
+fprintf('%d frame corretti (%s) in %s\n', nFrames, correctedName, emisDir);
 
 %% 3. Scala colore comune a tutta la sessione
 % Presa dai correction_report.json, cosi' non serve rileggere tutti i .npy:
 % con una scala fissa il confronto fra frame e' onesto (un frame non sembra
-% piu' caldo solo perche' riscalato su se stesso).
+% piu' caldo solo perche' riscalato su se stesso). Il report non ha un nome
+% configurabile ed e' sempre quello dell'ultima run di correct_session.py,
+% quindi e' automaticamente coerente con correctedName sopra finche' quella
+% run e' stata fatta con lo stesso --material-map-dir del consenso.
 %
 % Non si usano pero' il minimo e il massimo assoluti: in questa sessione un
 % solo frame arriva a 62 C su una manciata di pixel, e prendendolo alla
@@ -137,17 +152,15 @@ S.showSegs    = true;    % overlay dei bordi dei superpixel (griglia SLIC)
 S.pinned      = false;   % lettura bloccata sul punto cliccato
 S.pinXY       = [NaN NaN];
 S.materialDir = materialDir;
-S.framesDir   = framesDir;
 S.cache       = struct();
 
 %% 5. Figura
-S.fig = figure('Name', 'Correzione radiometrica - apparente vs corretta', ...
+S.fig = figure('Name', 'Correzione radiometrica - apparente vs corretta (consenso)', ...
                'NumberTitle', 'off', 'Color', 'w', ...
-               'Units', 'normalized', 'Position', [0.03 0.15 0.94 0.70]);
+               'Units', 'normalized', 'Position', [0.08 0.15 0.84 0.70]);
 
-S.axApp  = subplot(1, 3, 1, 'Parent', S.fig);
-S.axCorr = subplot(1, 3, 2, 'Parent', S.fig);
-S.axZed  = subplot(1, 3, 3, 'Parent', S.fig);
+S.axApp  = subplot(1, 2, 1, 'Parent', S.fig);
+S.axCorr = subplot(1, 2, 2, 'Parent', S.fig);
 
 S.imApp  = imagesc(S.axApp,  zeros(2));
 S.imCorr = imagesc(S.axCorr, zeros(2));
@@ -155,13 +168,6 @@ axis(S.axApp,  'image'); axis(S.axCorr, 'image');
 colormap(S.fig, inferno_like());
 cb1 = colorbar(S.axApp);  cb1.Label.String = 'deg C';
 cb2 = colorbar(S.axCorr); cb2.Label.String = 'deg C';
-
-% Terzo pannello: il frame ZED da cui nascono i superpixel e, tramite CLIP,
-% l'emissivita'. E' un'immagine RGB vera (image, non imagesc), quindi non
-% risente della colormap termica ne' della scala colore.
-S.imZed = image(S.axZed, zeros(2, 2, 3, 'uint8'));
-axis(S.axZed, 'image');
-set(S.axZed, 'XTick', [], 'YTick', []);
 
 hold(S.axApp,  'on');
 hold(S.axCorr, 'on');
@@ -174,14 +180,6 @@ S.markApp  = plot(S.axApp,  NaN, NaN, '+', 'Color', 'c', 'MarkerSize', 14, 'Line
 S.markCorr = plot(S.axCorr, NaN, NaN, '+', 'Color', 'c', 'MarkerSize', 14, 'LineWidth', 1.5);
 hold(S.axApp,  'off');
 hold(S.axCorr, 'off');
-
-hold(S.axZed, 'on');
-S.segsZed = plot(S.axZed, NaN, NaN, '-', 'Color', [1 1 0 0.55], 'LineWidth', 0.5);
-% Riquadro del superpixel puntato: e' il crop che CLIP ha effettivamente
-% classificato (bbox da segments.json), piu' il suo centroide.
-S.boxZed  = plot(S.axZed, NaN, NaN, '-', 'Color', 'c', 'LineWidth', 1.5);
-S.markZed = plot(S.axZed, NaN, NaN, '+', 'Color', 'c', 'MarkerSize', 14, 'LineWidth', 1.5);
-hold(S.axZed, 'off');
 
 % Riga di lettura sotto le due immagini.
 S.readout = annotation(S.fig, 'textbox', [0.02 0.005 0.96 0.085], ...
@@ -221,6 +219,10 @@ if ~isfield(S.cache, key)
     % I bordi dei superpixel si ricavano una volta sola: sono fissi per frame.
     [D.segX, D.segY] = segBoundaryLines(D.segment);
 
+    % segments.json del consenso: top_material e' il materiale FINALE
+    % (dopo il voto), consensus.from_frame la scelta della singola vista se
+    % il voto l'ha cambiata, consensus.agreement la frazione di voti che
+    % sostiene il materiale finale.
     D.material = containers.Map('KeyType', 'double', 'ValueType', 'any');
     segPath = fullfile(S.materialDir, f.stem, 'segments.json');
     if isfile(segPath)
@@ -232,29 +234,6 @@ if ~isfield(S.cache, key)
         end
     end
 
-    % Frame ZED sorgente: il nome sta in stats.json (source_zed_frame), che
-    % project_to_flir.py scrive accanto alle mappe. I superpixel qui sono
-    % quelli originali di SLIC (labels.npy, risoluzione ZED), non la loro
-    % riproiezione su FLIR.
-    D.zed     = [];
-    D.zedName = '';
-    statsPath = fullfile(f.dir, 'stats.json');
-    if isfile(statsPath)
-        st = jsondecode(fileread(statsPath));
-        if isfield(st, 'source_zed_frame')
-            D.zedName = st.source_zed_frame;
-            zedPath = fullfile(S.framesDir, D.zedName);
-            if isfile(zedPath)
-                D.zed = imread(zedPath);
-            end
-        end
-    end
-    D.labels = tryReadNPY(fullfile(S.materialDir, f.stem, 'labels.npy'));
-    [D.zedSegX, D.zedSegY] = segBoundaryLines(D.labels);
-    % segments.json non salva la bbox: la si ricava dalle label, una volta
-    % per frame, per poter evidenziare il crop passato a CLIP.
-    D.bbox = segBBoxes(D.labels);
-
     S.cache.(key) = D;
 end
 D = S.cache.(key);
@@ -264,14 +243,6 @@ set(S.imCorr, 'CData', D.corrected);
 [h, w] = size(D.apparent);
 set(S.axApp,  'XLim', [0.5 w+0.5], 'YLim', [0.5 h+0.5]);
 set(S.axCorr, 'XLim', [0.5 w+0.5], 'YLim', [0.5 h+0.5]);
-
-if ~isempty(D.zed)
-    set(S.imZed, 'CData', D.zed);
-    set(S.axZed, 'XLim', [0.5 size(D.zed, 2)+0.5], 'YLim', [0.5 size(D.zed, 1)+0.5]);
-else
-    set(S.imZed, 'CData', zeros(2, 2, 3, 'uint8'));
-    set(S.axZed, 'XLim', [0.5 2.5], 'YLim', [0.5 2.5]);
-end
 
 if S.lockedClim
     clim(S.axApp,  S.sessClim);
@@ -285,18 +256,9 @@ end
 
 title(S.axApp, sprintf('PRIMA - apparente (FLIR grezzo)\nmin %.1f  max %.1f  media %.1f C', ...
       min(D.apparent(:)), max(D.apparent(:)), mean(D.apparent(:))), 'FontSize', 9);
-title(S.axCorr, sprintf('DOPO - corretta (emissivita + atmosfera)\nmin %.1f  max %.1f  media %.1f C', ...
+title(S.axCorr, sprintf('DOPO - corretta (consenso multi-vista)\nmin %.1f  max %.1f  media %.1f C', ...
       min(D.corrected(:), [], 'omitnan'), max(D.corrected(:), [], 'omitnan'), ...
       mean(D.corrected(:), 'omitnan')), 'FontSize', 9);
-
-if isempty(D.zed)
-    zedTitle = sprintf('ZED - sorgente emissivita\nframe non trovato in %s', S.framesDir);
-else
-    nSeg = 0;
-    if ~isempty(D.labels), nSeg = numel(unique(D.labels(:))); end
-    zedTitle = sprintf('ZED - da qui superpixel + CLIP\n%s   %d superpixel', D.zedName, nSeg);
-end
-title(S.axZed, zedTitle, 'FontSize', 9, 'Interpreter', 'none');
 
 nNaN = sum(isnan(D.corrected(:)));
 sgtitle(S.fig, sprintf('[%d/%d]  %s     %s     NaN %d px     (frecce = scorri, click = blocca punto, b = bordi superpixel)', ...
@@ -317,12 +279,6 @@ if S.showSegs && ~isempty(D.segX)
 else
     set(S.segsApp,  'XData', NaN, 'YData', NaN);
     set(S.segsCorr, 'XData', NaN, 'YData', NaN);
-end
-
-if S.showSegs && ~isempty(D.zedSegX)
-    set(S.segsZed, 'XData', D.zedSegX, 'YData', D.zedSegY);
-else
-    set(S.segsZed, 'XData', NaN, 'YData', NaN);
 end
 
 guidata(fig, S);
@@ -346,8 +302,6 @@ if isnan(xi) || xi < 1 || xi > w || yi < 1 || yi > h
         'Punta il mouse sull''immagine per leggere la temperatura prima / dopo la correzione.');
     set(S.markApp,  'XData', NaN, 'YData', NaN);
     set(S.markCorr, 'XData', NaN, 'YData', NaN);
-    set(S.boxZed,   'XData', NaN, 'YData', NaN);
-    set(S.markZed,  'XData', NaN, 'YData', NaN);
     return
 end
 
@@ -371,30 +325,32 @@ end
 if ~isempty(D.distance) && D.distance(yi, xi) > 0
     parts{end+1} = sprintf('distanza LiDAR %.2f m', D.distance(yi, xi));
 end
-% Il superpixel puntato viene anche evidenziato sul frame ZED: la bbox e' il
-% crop che CLIP ha classificato, quindi si vede subito su cosa ha deciso.
-bx = NaN; by = NaN; cx = NaN; cy = NaN;
 if ~isempty(D.segment)
     sid = double(D.segment(yi, xi));
     if sid >= 0 && isKey(D.material, sid)
         s = D.material(sid);
-        parts{end+1} = sprintf('segmento %d = %s (CLIP %.0f%%)', ...
-                               sid, s.top_material, 100 * s.confidence);
-        if isKey(D.bbox, sid)
-            b = D.bbox(sid);          % [x0 y0 x1 y1] in pixel ZED, 1-based
-            bx = [b(1)-0.5 b(3)+0.5 b(3)+0.5 b(1)-0.5 b(1)-0.5];
-            by = [b(2)-0.5 b(2)-0.5 b(4)+0.5 b(4)+0.5 b(2)-0.5];
-        end
-        if isfield(s, 'centroid_px')
-            cx = double(s.centroid_px(1)) + 1;   % 0-based Python -> 1-based
-            cy = double(s.centroid_px(2)) + 1;
+        % consensus.status: 'ok' = il segmento ha avuto voti e mostra
+        % l'accordo del voto sul materiale FINALE; 'no_lidar_sample' = nessun
+        % punto LiDAR di nessuna vista e' caduto su questo segmento, quindi
+        % il materiale e' ancora quello della singola vista (CLIP puro).
+        hasConsensus = isfield(s, 'consensus') && isstruct(s.consensus) && isfield(s.consensus, 'status');
+        if hasConsensus && strcmp(s.consensus.status, 'ok')
+            c = s.consensus;
+            if isfield(c, 'from_frame') && ~isempty(c.from_frame) && ~strcmp(c.from_frame, s.top_material)
+                parts{end+1} = sprintf('segmento %d = %s (voto %.0f%%, la singola vista diceva %s)', ...
+                                       sid, s.top_material, 100 * c.agreement, c.from_frame);
+            else
+                parts{end+1} = sprintf('segmento %d = %s (voto %.0f%%)', ...
+                                       sid, s.top_material, 100 * c.agreement);
+            end
+        else
+            parts{end+1} = sprintf('segmento %d = %s (CLIP %.0f%%, nessun consenso multi-vista)', ...
+                                   sid, s.top_material, 100 * s.confidence);
         end
     else
         parts{end+1} = sprintf('segmento %d', sid);
     end
 end
-set(S.boxZed,  'XData', bx, 'YData', by);
-set(S.markZed, 'XData', cx, 'YData', cy);
 if ~isempty(D.sampled)
     if D.sampled(yi, xi)
         parts{end+1} = 'campione LiDAR diretto';
@@ -479,30 +435,6 @@ switch ev.Key
         S.lockedClim = ~S.lockedClim;
         guidata(fig, S);
         loadFrame(fig, S.idx);
-end
-end
-
-
-%% ------------------------------------------------------------------ %%
-function B = segBBoxes(labels)
-%SEGBBOXES Bounding box di ogni superpixel: mappa id -> [x0 y0 x1 y1] in
-% pixel MATLAB (1-based, estremi inclusi). E' l'equivalente di segment_boxes()
-% in emissivity\segmentation.py, ricalcolato qui perche' classify_session.py
-% non riporta la bbox in segments.json.
-B = containers.Map('KeyType', 'double', 'ValueType', 'any');
-if isempty(labels)
-    return
-end
-lab = double(labels);
-[h, w] = size(lab);
-[ids, ~, idx] = unique(lab(:));
-[Y, X] = ndgrid(1:h, 1:w);
-x0 = accumarray(idx, X(:), [], @min);
-x1 = accumarray(idx, X(:), [], @max);
-y0 = accumarray(idx, Y(:), [], @min);
-y1 = accumarray(idx, Y(:), [], @max);
-for i = 1:numel(ids)
-    B(ids(i)) = [x0(i) y0(i) x1(i) y1(i)];
 end
 end
 
