@@ -1,58 +1,58 @@
 function ShowTemperatureCorrection(sessionDirIn, flirDirIn)
-%% Confronto interattivo temperatura apparente / corretta (sessione 9)
-% Mostra il frame FLIR della sessione e, puntando col mouse su un pixel,
-% legge la temperatura PRIMA della correzione radiometrica (il .npy grezzo
-% della camera, temperatura apparente) e DOPO (corrected_temperature_consensus.npy
-% prodotto da RadiometricCalibration\correct_session.py con i materiali del
-% consenso multi-vista di EmissivityCalculation\voxel_consensus.py --stage
-% vote), con la differenza.
+%% Interactive comparison of apparent / corrected temperature (session 9)
+% Shows the session's FLIR frame and, hovering the mouse over a pixel,
+% reads the temperature BEFORE radiometric correction (the raw camera .npy,
+% apparent temperature) and AFTER (corrected_temperature_consensus.npy
+% produced by RadiometricCalibration\correct_session.py with the multi-view
+% consensus materials from EmissivityCalculation\voxel_consensus.py --stage
+% vote), with the difference.
 %
-% Stessa idea di RadiometricCalibration\ThermalData.py --show (hover per
-% leggere il valore sotto il cursore), ma qui i valori sono due e affiancati,
-% e si puo' scorrere tutta la sessione con le frecce.
+% Same idea as RadiometricCalibration\ThermalData.py --show (hover to read
+% the value under the cursor), but here there are two values side by side,
+% and the whole session can be scrolled through with the arrow keys.
 %
-% Oltre alla temperatura, per il pixel puntato vengono mostrati anche i dati
-% che hanno determinato la correzione: emissivita' applicata, distanza LiDAR,
-% materiale di consenso (con l'accordo del voto, e se il consenso ha cambiato
-% idea rispetto alla singola vista) e se quel pixel era un campione LiDAR
-% diretto oppure riempito per vicinanza (sampled_mask). Serve a capire subito
-% se un valore strano e' misurato o interpolato.
+% Besides the temperature, the pointed pixel also shows the data that
+% determined the correction: applied emissivity, LiDAR distance, consensus
+% material (with the vote's agreement, and whether the consensus changed its
+% mind relative to the single view), and whether that pixel was a direct
+% LiDAR sample or filled by nearest neighbour (sampled_mask). This makes it
+% immediately clear whether a strange value is measured or interpolated.
 %
-% Comandi da tastiera:
-%   freccia dx / sx   frame successivo / precedente
-%   pag su / pag giu  avanti / indietro di 10 frame
-%   home / fine       primo / ultimo frame
-%   c                 blocca (o sblocca) la lettura sul punto cliccato
-%   s                 mostra / nasconde i campioni LiDAR diretti
-%   b                 mostra / nasconde i bordi dei superpixel (segment_id)
-%   l                 scala colore fissa su tutta la sessione / per frame
+% Keyboard commands:
+%   right / left arrow    next / previous frame
+%   page up / page down   forward / back 10 frames
+%   home / end            first / last frame
+%   c                      lock (or unlock) the reading on the clicked point
+%   s                      show / hide the direct LiDAR samples
+%   b                      show / hide the superpixel boundaries (segment_id)
+%   l                      fixed colour scale over the whole session / per frame
 %
-% Uso:
-%   ShowTemperatureCorrection                       % percorsi di default, qui sotto
-%   ShowTemperatureCorrection(sessionDir)           % altra sessione ZED
+% Usage:
+%   ShowTemperatureCorrection                       % default paths, below
+%   ShowTemperatureCorrection(sessionDir)           % another ZED session
 %   ShowTemperatureCorrection(sessionDir, flirDir)
 
 close all
 clc
 
-%% 1. Parametri
+%% 1. Parameters
 sessionDir = 'C:\Users\loren\Desktop\Dati_vfinal\SLAM\ZED\20260730_161223\fullrate';
 flirDir    = 'C:\Users\loren\Desktop\Dati_vfinal\SLAM\Flir\session9_only_rot180';
 
-% Nome del file corretto da leggere in ogni emissivity_map\<stem>\ e cartella
-% dei materiali da cui viene il testo del readout ("segmento N = materiale").
-% Di default sono quelli prodotti dal consenso multi-vista (la pipeline
-% corrente): correctedName in emissivity_map\<stem>\ e' scritto da
-% correct_session.py --material-map-dir material_map_consensus, mentre
-% emissivity_used.npy / correction_report.json non hanno un nome
-% configurabile e vengono sempre sovrascritti dall'ultima run di
-% correct_session.py -- quindi vanno gia' letti insieme a questo file, non
-% al vecchio corrected_temperature.npy (che sul disco resta quello della
-% primissima run, single-view, e non e' piu' coerente con emissivity_used).
+% Name of the corrected file to read in each emissivity_map\<stem>\, and the
+% materials folder the readout text ("segment N = material") comes from.
+% Defaults are the ones produced by the multi-view consensus (the current
+% pipeline): correctedName in emissivity_map\<stem>\ is written by
+% correct_session.py --material-map-dir material_map_consensus, while
+% emissivity_used.npy / correction_report.json have no configurable name and
+% are always overwritten by the last correct_session.py run -- so they must
+% already be read together with this file, not with the old
+% corrected_temperature.npy (which on disk is still the very first run,
+% single-view, and is no longer consistent with emissivity_used).
 correctedName = 'corrected_temperature_consensus.npy';
 materialDirName = 'material_map_consensus';
 
-% Gli argomenti, se passati, hanno la precedenza sui default qui sopra.
+% The arguments, if passed, take precedence over the defaults above.
 if nargin >= 1 && ~isempty(sessionDirIn)
     sessionDir = sessionDirIn;
 end
@@ -64,28 +64,28 @@ emisDir     = fullfile(sessionDir, 'emissivity_map');
 materialDir = fullfile(sessionDir, materialDirName);
 
 if ~isfolder(emisDir)
-    error('Cartella emissivity_map non trovata: %s', emisDir);
+    error('emissivity_map folder not found: %s', emisDir);
 end
 if ~isfolder(flirDir)
-    error('Cartella FLIR non trovata: %s', flirDir);
+    error('FLIR folder not found: %s', flirDir);
 end
 if ~isfolder(materialDir)
-    warning('Cartella materiali non trovata: %s (il readout non mostrera'' i materiali)', materialDir);
+    warning('Materials folder not found: %s (the readout will not show materials)', materialDir);
 end
 
-%% 2. Elenco dei frame corretti
-% Un frame e' utilizzabile solo se esistono sia il .npy apparente sia la
-% correzione: correct_session.py salta i frame senza distance/segment_id.
+%% 2. List of corrected frames
+% A frame is usable only if both the apparent .npy and the correction exist:
+% correct_session.py skips frames without distance/segment_id.
 d = dir(fullfile(emisDir, '*'));
 d = d([d.isdir] & ~ismember({d.name}, {'.', '..'}));
 
 frames = struct('stem', {}, 'apparentPath', {}, 'correctedPath', {}, 'dir', {});
 for k = 1:numel(d)
-    stem = d(k).name;                       % es. 20250906_233144_R
+    stem = d(k).name;                       % e.g. 20250906_233144_R
     frameDir = fullfile(emisDir, stem);
     corrPath = fullfile(frameDir, correctedName);
 
-    % Il .npy FLIR grezzo non ha il suffisso _R del nome cartella.
+    % The raw FLIR .npy does not have the folder name's _R suffix.
     appPath = fullfile(flirDir, [strrep(stem, '_R', '') '.npy']);
 
     if isfile(corrPath) && isfile(appPath)
@@ -97,25 +97,26 @@ for k = 1:numel(d)
 end
 
 if isempty(frames)
-    error('Nessun frame con "%s" trovato in %s', correctedName, emisDir);
+    error('No frame with "%s" found in %s', correctedName, emisDir);
 end
 nFrames = numel(frames);
-fprintf('%d frame corretti (%s) in %s\n', nFrames, correctedName, emisDir);
+fprintf('%d corrected frames (%s) in %s\n', nFrames, correctedName, emisDir);
 
-%% 3. Scala colore comune a tutta la sessione
-% Presa dai correction_report.json, cosi' non serve rileggere tutti i .npy:
-% con una scala fissa il confronto fra frame e' onesto (un frame non sembra
-% piu' caldo solo perche' riscalato su se stesso). Il report non ha un nome
-% configurabile ed e' sempre quello dell'ultima run di correct_session.py,
-% quindi e' automaticamente coerente con correctedName sopra finche' quella
-% run e' stata fatta con lo stesso --material-map-dir del consenso.
+%% 3. Colour scale common to the whole session
+% Taken from correction_report.json, so there is no need to re-read every
+% .npy: a fixed scale makes the comparison between frames honest (a frame
+% does not look hotter just because it was rescaled against itself). The
+% report has no configurable name and is always the one from the last
+% correct_session.py run, so it is automatically consistent with
+% correctedName above as long as that run was made with the same
+% --material-map-dir as the consensus.
 %
-% Non si usano pero' il minimo e il massimo assoluti: in questa sessione un
-% solo frame arriva a 62 C su una manciata di pixel, e prendendolo alla
-% lettera tutti gli altri frame finirebbero schiacciati nel primo quinto
-% della palette (immagini tutte viola scuro). Si scarta quindi la coda con
-% dei percentili sui minimi/massimi dei singoli frame: la scala resta comune
-% a tutta la sessione, ma coperta davvero dai dati.
+% The absolute minimum and maximum are not used, though: in this session a
+% single frame reaches 62 C on a handful of pixels, and taking that
+% literally would squash every other frame into the first fifth of the
+% palette (all-dark-purple images). The tail is therefore discarded using
+% percentiles over each frame's own min/max: the scale stays common to the
+% whole session, but genuinely covered by the data.
 fMin = nan(nFrames, 1);
 fMax = nan(nFrames, 1);
 for k = 1:nFrames
@@ -135,27 +136,27 @@ else
     sessMin = pctOf(fMin, 0.05);
     sessMax = pctOf(fMax, 0.95);
 end
-fprintf('Scala colore sessione: %.1f .. %.1f C', sessMin, sessMax);
+fprintf('Session colour scale: %.1f .. %.1f C', sessMin, sessMax);
 if ~isempty(fMax)
-    fprintf('  (estremi reali %.1f .. %.1f C, code escluse)', min(fMin), max(fMax));
+    fprintf('  (real extremes %.1f .. %.1f C, tails excluded)', min(fMin), max(fMax));
 end
 fprintf('\n');
 
-%% 4. Stato dell'interfaccia
+%% 4. Interface state
 S.frames      = frames;
 S.nFrames     = nFrames;
 S.idx         = 1;
 S.sessClim    = [sessMin sessMax];
-S.lockedClim  = true;    % true = scala fissa sessione, false = per frame
-S.showSamples = false;   % overlay dei campioni LiDAR diretti
-S.showSegs    = true;    % overlay dei bordi dei superpixel (griglia SLIC)
-S.pinned      = false;   % lettura bloccata sul punto cliccato
+S.lockedClim  = true;    % true = fixed session scale, false = per frame
+S.showSamples = false;   % overlay of the direct LiDAR samples
+S.showSegs    = true;    % overlay of the superpixel boundaries (SLIC grid)
+S.pinned      = false;   % reading locked on the clicked point
 S.pinXY       = [NaN NaN];
 S.materialDir = materialDir;
 S.cache       = struct();
 
-%% 5. Figura
-S.fig = figure('Name', 'Correzione radiometrica - apparente vs corretta (consenso)', ...
+%% 5. Figure
+S.fig = figure('Name', 'Radiometric correction - apparent vs corrected (consensus)', ...
                'NumberTitle', 'off', 'Color', 'w', ...
                'Units', 'normalized', 'Position', [0.08 0.15 0.84 0.70]);
 
@@ -173,7 +174,7 @@ hold(S.axApp,  'on');
 hold(S.axCorr, 'on');
 S.samplesApp  = plot(S.axApp,  NaN, NaN, '.', 'Color', [0 0.6 1], 'MarkerSize', 1);
 S.samplesCorr = plot(S.axCorr, NaN, NaN, '.', 'Color', [0 0.6 1], 'MarkerSize', 1);
-% Reticolo dei superpixel: una sola linea NaN-separata per asse.
+% Superpixel grid: a single NaN-separated line per axis.
 S.segsApp  = plot(S.axApp,  NaN, NaN, '-', 'Color', [1 1 1 0.45], 'LineWidth', 0.5);
 S.segsCorr = plot(S.axCorr, NaN, NaN, '-', 'Color', [1 1 1 0.45], 'LineWidth', 0.5);
 S.markApp  = plot(S.axApp,  NaN, NaN, '+', 'Color', 'c', 'MarkerSize', 14, 'LineWidth', 1.5);
@@ -181,7 +182,7 @@ S.markCorr = plot(S.axCorr, NaN, NaN, '+', 'Color', 'c', 'MarkerSize', 14, 'Line
 hold(S.axApp,  'off');
 hold(S.axCorr, 'off');
 
-% Riga di lettura sotto le due immagini.
+% Readout line under the two images.
 S.readout = annotation(S.fig, 'textbox', [0.02 0.005 0.96 0.085], ...
                        'String', '', 'FontName', 'Consolas', 'FontSize', 10, ...
                        'EdgeColor', [0.8 0.8 0.8], 'BackgroundColor', [0.97 0.97 0.97], ...
@@ -199,7 +200,7 @@ end % ShowTemperatureCorrection
 
 %% ------------------------------------------------------------------ %%
 function loadFrame(fig, idx)
-%LOADFRAME Carica e disegna il frame idx (con cache dei .npy gia' letti).
+%LOADFRAME Loads and draws frame idx (with a cache of already-read .npy files).
 S = guidata(fig);
 S.idx = max(1, min(S.nFrames, idx));
 f = S.frames(S.idx);
@@ -209,20 +210,20 @@ if ~isfield(S.cache, key)
     D.apparent  = readNPY(f.apparentPath);
     D.corrected = readNPY(f.correctedPath);
 
-    % I file accessori possono mancare: la lettura resta comunque possibile,
-    % semplicemente senza emissivita' / distanza / materiale.
+    % The accessory files may be missing: reading is still possible, just
+    % without emissivity / distance / material.
     D.emissivity = tryReadNPY(fullfile(f.dir, 'emissivity_used.npy'));
     D.distance   = tryReadNPY(fullfile(f.dir, 'distance.npy'));
     D.segment    = tryReadNPY(fullfile(f.dir, 'segment_id.npy'));
     D.sampled    = tryReadNPY(fullfile(f.dir, 'sampled_mask.npy'));
 
-    % I bordi dei superpixel si ricavano una volta sola: sono fissi per frame.
+    % The superpixel boundaries are computed once: they are fixed per frame.
     [D.segX, D.segY] = segBoundaryLines(D.segment);
 
-    % segments.json del consenso: top_material e' il materiale FINALE
-    % (dopo il voto), consensus.from_frame la scelta della singola vista se
-    % il voto l'ha cambiata, consensus.agreement la frazione di voti che
-    % sostiene il materiale finale.
+    % Consensus segments.json: top_material is the FINAL material (after the
+    % vote), consensus.from_frame is the single view's choice if the vote
+    % changed it, consensus.agreement is the fraction of votes backing the
+    % final material.
     D.material = containers.Map('KeyType', 'double', 'ValueType', 'any');
     segPath = fullfile(S.materialDir, f.stem, 'segments.json');
     if isfile(segPath)
@@ -247,21 +248,21 @@ set(S.axCorr, 'XLim', [0.5 w+0.5], 'YLim', [0.5 h+0.5]);
 if S.lockedClim
     clim(S.axApp,  S.sessClim);
     clim(S.axCorr, S.sessClim);
-    climTag = sprintf('scala fissa %.1f-%.1f C', S.sessClim(1), S.sessClim(2));
+    climTag = sprintf('fixed scale %.1f-%.1f C', S.sessClim(1), S.sessClim(2));
 else
     clim(S.axApp,  robustClim(D.apparent));
     clim(S.axCorr, robustClim(D.corrected));
-    climTag = 'scala per frame';
+    climTag = 'per-frame scale';
 end
 
-title(S.axApp, sprintf('PRIMA - apparente (FLIR grezzo)\nmin %.1f  max %.1f  media %.1f C', ...
+title(S.axApp, sprintf('BEFORE - apparent (raw FLIR)\nmin %.1f  max %.1f  mean %.1f C', ...
       min(D.apparent(:)), max(D.apparent(:)), mean(D.apparent(:))), 'FontSize', 9);
-title(S.axCorr, sprintf('DOPO - corretta (consenso multi-vista)\nmin %.1f  max %.1f  media %.1f C', ...
+title(S.axCorr, sprintf('AFTER - corrected (multi-view consensus)\nmin %.1f  max %.1f  mean %.1f C', ...
       min(D.corrected(:), [], 'omitnan'), max(D.corrected(:), [], 'omitnan'), ...
       mean(D.corrected(:), 'omitnan')), 'FontSize', 9);
 
 nNaN = sum(isnan(D.corrected(:)));
-sgtitle(S.fig, sprintf('[%d/%d]  %s     %s     NaN %d px     (frecce = scorri, click = blocca punto, b = bordi superpixel)', ...
+sgtitle(S.fig, sprintf('[%d/%d]  %s     %s     NaN %d px     (arrows = scroll, click = lock point, b = superpixel boundaries)', ...
         S.idx, S.nFrames, f.stem, climTag, nNaN), 'FontSize', 10, 'Interpreter', 'none');
 
 if S.showSamples && ~isempty(D.sampled)
@@ -292,14 +293,14 @@ end
 
 %% ------------------------------------------------------------------ %%
 function updateReadout(fig, xi, yi)
-%UPDATEREADOUT Riempie la riga di testo con i valori del pixel (xi, yi).
+%UPDATEREADOUT Fills the text line with the values of pixel (xi, yi).
 S = guidata(fig);
 D = S.cache.(matlab.lang.makeValidName(S.frames(S.idx).stem));
 [h, w] = size(D.apparent);
 
 if isnan(xi) || xi < 1 || xi > w || yi < 1 || yi > h
     set(S.readout, 'String', ...
-        'Punta il mouse sull''immagine per leggere la temperatura prima / dopo la correzione.');
+        'Point the mouse over the image to read the temperature before / after the correction.');
     set(S.markApp,  'XData', NaN, 'YData', NaN);
     set(S.markCorr, 'XData', NaN, 'YData', NaN);
     return
@@ -310,58 +311,58 @@ tAfter  = double(D.corrected(yi, xi));
 delta   = tAfter - tBefore;
 
 if isnan(tAfter)
-    line1 = sprintf('x=%3d y=%3d   PRIMA %6.2f C   DOPO   NaN (nessun materiale plausibile)', ...
+    line1 = sprintf('x=%3d y=%3d   BEFORE %6.2f C   AFTER   NaN (no plausible material)', ...
                     xi, yi, tBefore);
 else
-    line1 = sprintf('x=%3d y=%3d   PRIMA %6.2f C   DOPO %6.2f C   DELTA %+5.2f C', ...
+    line1 = sprintf('x=%3d y=%3d   BEFORE %6.2f C   AFTER %6.2f C   DELTA %+5.2f C', ...
                     xi, yi, tBefore, tAfter, delta);
 end
 
-% Seconda riga: da dove viene quella correzione.
+% Second line: where that correction comes from.
 parts = {};
 if ~isempty(D.emissivity) && ~isnan(D.emissivity(yi, xi))
-    parts{end+1} = sprintf('emissivita %.3f', D.emissivity(yi, xi));
+    parts{end+1} = sprintf('emissivity %.3f', D.emissivity(yi, xi));
 end
 if ~isempty(D.distance) && D.distance(yi, xi) > 0
-    parts{end+1} = sprintf('distanza LiDAR %.2f m', D.distance(yi, xi));
+    parts{end+1} = sprintf('LiDAR distance %.2f m', D.distance(yi, xi));
 end
 if ~isempty(D.segment)
     sid = double(D.segment(yi, xi));
     if sid >= 0 && isKey(D.material, sid)
         s = D.material(sid);
-        % consensus.status: 'ok' = il segmento ha avuto voti e mostra
-        % l'accordo del voto sul materiale FINALE; 'no_lidar_sample' = nessun
-        % punto LiDAR di nessuna vista e' caduto su questo segmento, quindi
-        % il materiale e' ancora quello della singola vista (CLIP puro).
+        % consensus.status: 'ok' = the segment received votes and shows the
+        % vote's agreement on the FINAL material; 'no_lidar_sample' = no
+        % LiDAR point from any view landed on this segment, so the material
+        % is still the single view's own (pure CLIP).
         hasConsensus = isfield(s, 'consensus') && isstruct(s.consensus) && isfield(s.consensus, 'status');
         if hasConsensus && strcmp(s.consensus.status, 'ok')
             c = s.consensus;
             if isfield(c, 'from_frame') && ~isempty(c.from_frame) && ~strcmp(c.from_frame, s.top_material)
-                parts{end+1} = sprintf('segmento %d = %s (voto %.0f%%, la singola vista diceva %s)', ...
+                parts{end+1} = sprintf('segment %d = %s (vote %.0f%%, the single view said %s)', ...
                                        sid, s.top_material, 100 * c.agreement, c.from_frame);
             else
-                parts{end+1} = sprintf('segmento %d = %s (voto %.0f%%)', ...
+                parts{end+1} = sprintf('segment %d = %s (vote %.0f%%)', ...
                                        sid, s.top_material, 100 * c.agreement);
             end
         else
-            parts{end+1} = sprintf('segmento %d = %s (CLIP %.0f%%, nessun consenso multi-vista)', ...
+            parts{end+1} = sprintf('segment %d = %s (CLIP %.0f%%, no multi-view consensus)', ...
                                    sid, s.top_material, 100 * s.confidence);
         end
     else
-        parts{end+1} = sprintf('segmento %d', sid);
+        parts{end+1} = sprintf('segment %d', sid);
     end
 end
 if ~isempty(D.sampled)
     if D.sampled(yi, xi)
-        parts{end+1} = 'campione LiDAR diretto';
+        parts{end+1} = 'direct LiDAR sample';
     else
-        parts{end+1} = 'riempito per vicinanza (non misurato)';
+        parts{end+1} = 'filled by nearest neighbour (not measured)';
     end
 end
 line2 = strjoin(parts, '   |   ');
 
 if S.pinned
-    line1 = ['[BLOCCATO]  ' line1];
+    line1 = ['[LOCKED]  ' line1];
 end
 set(S.readout, 'String', {line1, line2});
 set(S.markApp,  'XData', xi, 'YData', yi);
@@ -371,7 +372,7 @@ end
 
 %% ------------------------------------------------------------------ %%
 function [xi, yi, inside] = cursorPixel(fig)
-%CURSORPIXEL Pixel intero sotto il cursore, in uno qualsiasi dei due assi.
+%CURSORPIXEL Integer pixel under the cursor, in either of the two axes.
 S = guidata(fig);
 xi = NaN; yi = NaN; inside = false;
 for ax = [S.axApp, S.axCorr]
@@ -441,22 +442,22 @@ end
 
 %% ------------------------------------------------------------------ %%
 function [X, Y] = segBoundaryLines(seg)
-%SEGBOUNDARYLINES Reticolo dei superpixel: segmenti di linea NaN-separati
-% lungo ogni confine fra due segment_id diversi. Le linee cadono a meta' fra
-% due pixel (x+0.5 / y+0.5), quindi combaciano con i bordi mostrati da
-% imagesc e disegnano i quadrati SLIC senza coprire i pixel.
+%SEGBOUNDARYLINES Superpixel grid: NaN-separated line segments along every
+% boundary between two different segment_id values. The lines fall halfway
+% between two pixels (x+0.5 / y+0.5), so they line up with the edges shown
+% by imagesc and draw the SLIC squares without covering the pixels.
 X = NaN; Y = NaN;
 if isempty(seg)
     return
 end
 seg = double(seg);
 
-% Confini verticali: fra la colonna x e la x+1.
+% Vertical boundaries: between column x and x+1.
 [yv, xv] = find(seg(:, 1:end-1) ~= seg(:, 2:end));
 Xv = [xv + 0.5, xv + 0.5, nan(size(xv))]';
 Yv = [yv - 0.5, yv + 0.5, nan(size(yv))]';
 
-% Confini orizzontali: fra la riga y e la y+1.
+% Horizontal boundaries: between row y and y+1.
 [yh, xh] = find(seg(1:end-1, :) ~= seg(2:end, :));
 Xh = [xh - 0.5, xh + 0.5, nan(size(xh))]';
 Yh = [yh + 0.5, yh + 0.5, nan(size(yh))]';
@@ -471,8 +472,8 @@ end
 
 %% ------------------------------------------------------------------ %%
 function c = robustClim(A)
-%ROBUSTCLIM Limiti colore sui percentili 1-99, cosi' un singolo pixel caldo
-% non schiaccia tutto il resto dell'immagine.
+%ROBUSTCLIM Colour limits on the 1-99 percentiles, so a single hot pixel
+% does not squash the rest of the image.
 v = A(isfinite(A));
 if isempty(v)
     c = [0 1];
@@ -486,8 +487,8 @@ end
 
 
 function p = pctOf(v, q)
-%PCTOF Percentile q (0-1) di v, calcolato a mano per non dipendere dallo
-% Statistics Toolbox (prctile non e' sempre disponibile).
+%PCTOF Percentile q (0-1) of v, computed by hand to avoid depending on the
+% Statistics Toolbox (prctile is not always available).
 v = sort(v(isfinite(v)));
 if isempty(v)
     p = NaN;
@@ -498,8 +499,8 @@ end
 
 
 function cmap = inferno_like()
-%INFERNO_LIKE Palette scura->gialla stile 'inferno' (matplotlib), per avere
-% lo stesso aspetto di ThermalData.py --show senza toolbox aggiuntivi.
+%INFERNO_LIKE Dark->yellow palette in the style of matplotlib's 'inferno',
+% to match the look of ThermalData.py --show without extra toolboxes.
 anchors = [0.001 0.000 0.014
            0.259 0.039 0.406
            0.576 0.149 0.404
@@ -516,7 +517,7 @@ end
 
 %% ------------------------------------------------------------------ %%
 function A = tryReadNPY(path)
-%TRYREADNPY Come readNPY ma restituisce [] se il file non c'e'.
+%TRYREADNPY Like readNPY but returns [] if the file does not exist.
 if isfile(path)
     A = readNPY(path);
 else
@@ -526,22 +527,22 @@ end
 
 
 function A = readNPY(path)
-%READNPY Lettore minimale del formato .npy di NumPy (v1.0/2.0).
-% Copre i soli casi prodotti da questa pipeline: array 2-D, little-endian,
-% ordine C, dtype float32/float64/int32/int64/uint8/bool. Evita di dipendere
-% da npy-matlab, che non e' installato.
+%READNPY Minimal reader for NumPy's .npy format (v1.0/2.0).
+% Covers only the cases produced by this pipeline: 2-D array, little-endian,
+% C order, dtype float32/float64/int32/int64/uint8/bool. Avoids depending on
+% npy-matlab, which is not installed.
 fid = fopen(path, 'r');
 if fid < 0
-    error('Impossibile aprire %s', path);
+    error('Could not open %s', path);
 end
 cleaner = onCleanup(@() fclose(fid));
 
 magic = fread(fid, 6, '*uint8')';
 if ~isequal(magic, uint8([147 78 85 77 80 89]))   % \x93NUMPY
-    error('%s non e'' un file .npy', path);
+    error('%s is not a .npy file', path);
 end
 major = fread(fid, 1, 'uint8');
-fread(fid, 1, 'uint8');                            % minor, non serve
+fread(fid, 1, 'uint8');                            % minor, not needed
 if major == 1
     headerLen = fread(fid, 1, 'uint16=>double');
 else
@@ -553,7 +554,7 @@ descr = regexp(header, '''descr''\s*:\s*''([^'']+)''', 'tokens', 'once');
 fortran = regexp(header, '''fortran_order''\s*:\s*(True|False)', 'tokens', 'once');
 shapeTok = regexp(header, '''shape''\s*:\s*\(([^)]*)\)', 'tokens', 'once');
 if isempty(descr) || isempty(shapeTok)
-    error('Header .npy non riconosciuto in %s', path);
+    error('Unrecognised .npy header in %s', path);
 end
 descr = descr{1};
 shape = str2double(strsplit(strtrim(strrep(shapeTok{1}, ',', ' ')), ' '));
@@ -567,17 +568,17 @@ switch descr
     case {'|u1', '<u1', 'u1'},                 fmt = 'uint8=>uint8';
     case {'|b1', '<b1', 'b1'},                 fmt = 'uint8=>uint8';
     otherwise
-        error('dtype .npy non supportato (%s) in %s', descr, path);
+        error('Unsupported .npy dtype (%s) in %s', descr, path);
 end
 
 n = prod(shape);
 raw = fread(fid, n, fmt, 0, 'ieee-le');
 if numel(raw) ~= n
-    error('File .npy troncato: %s', path);
+    error('Truncated .npy file: %s', path);
 end
 
-% NumPy salva in ordine C (righe consecutive), MATLAB legge in ordine
-% colonne: si riempie trasposto e poi si traspone.
+% NumPy stores in C order (consecutive rows), MATLAB reads in column order:
+% it is filled transposed and then transposed back.
 if strcmp(fortran{1}, 'True')
     A = reshape(raw, shape);
 else
