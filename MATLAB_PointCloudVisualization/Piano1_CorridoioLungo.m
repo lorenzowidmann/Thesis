@@ -16,7 +16,11 @@ topicName  = '/cloud_registered';
 
 frameStep  = 1;      % 1 = tutti i frame. Alzare (es. 5) se la memoria non basta.
 maxFrames  = Inf;    % limite di frame da leggere, Inf = nessun limite
-voxelSize  = 0.01;   % m, dimensione voxel per il downsampling. 0 = disattivato
+voxelSize  = 0.01;   % m, downsampling della nuvola GEOMETRICA (Figura 1, sez. 8).
+                     % Qui non c'e' vincolo di registrazione incrociata LiDAR<->camera
+                     % (sono le sole coordinate XYZ da SLAM): puo' restare fine. Le
+                     % viste colorate per temperatura (sez. 9-10) usano un voxel
+                     % diverso e piu' grosso, vedi voxelSizeTemp piu' sotto.
 markerSize = 20;     % dimensione dei punti a schermo. Il default di pcshow e' piccolo
 
 %% 2. Apertura bag
@@ -143,9 +147,16 @@ colormap(gca, turbo);   % colore in funzione della quota Z
 % ProjectFlirOnZed_Session9.m / FlirZedViewer_Session9.m (vedi quegli
 % script per le fonti Obsidian dei parametri).
 %
-% Usa lo stesso pc (post ROI+denoise, PRIMA del downsample) e lo stesso
-% voxelSize del resto dello script, cosi' il voxel grid della colorazione
-% per temperatura e' identico a quello della vista principale.
+% Usa lo stesso pc (post ROI+denoise, PRIMA del downsample) della vista
+% principale, ma per il BINNING finale usa un voxel proprio (voxelSizeTemp),
+% non voxelSize: qui il colore di ogni punto viene da una riproiezione
+% LiDAR->camera (T_lidar_to_flir), che ha un errore composto di ~9 cm RMSE
+% (5.8 cm lidar->flir + 6.8 cm lidar->zed, vedi rig_calibration.yaml, PRIMA
+% della deriva SLAM) su QUALE pixel un dato punto sta davvero campionando.
+% Un voxel piu' piccolo di quell'errore non recupera dettaglio reale: mostra
+% il rumore di corrispondenza incrociata come se fosse struttura. 15 cm
+% (~1.6x il RMSE) resta un margine ragionevole sopra quella soglia; sotto i
+% ~10-12 cm il margine sparisce, sotto i 9 cm si e' sotto la soglia stessa.
 %
 % useCorrectedTemp = true legge la temperatura CORRETTA prodotta da
 % RadiometricCalibration/correct_session.py (emissivita' + atmosfera, con i
@@ -161,6 +172,10 @@ colormap(gca, turbo);   % colore in funzione della quota Z
 
 useCorrectedTemp = true;    % false = temperatura apparente grezza (comportamento originale)
 correctedName    = 'corrected_temperature_consensus.npy';
+voxelSizeTemp    = 0.15;    % m, binning delle viste a temperatura (sez. 9-10). Non
+                             % scendere sotto ~0.10-0.12 senza anche stringere
+                             % zBufferTol_m: sono due fonti di errore comparabili
+                             % che si sommano, non indipendenti.
 
 sessionRootSlam  = 'C:\Users\loren\Desktop\Dati_vfinal\SLAM';
 sessionDirZed    = fullfile(sessionRootSlam, 'ZED', '20260730_161223', 'fullrate');
@@ -282,7 +297,7 @@ else
 end
 
 pcTemp = pointCloud(xyzFilt, 'Intensity', temperature);
-pcViewTemp = pcdownsample(pcTemp, 'gridAverage', voxelSize);
+pcViewTemp = pcdownsample(pcTemp, 'gridAverage', voxelSizeTemp);
 
 hasTemp = isfinite(pcViewTemp.Intensity);
 fprintf('Voxel con temperatura media valida: %d / %d\n', sum(hasTemp), pcViewTemp.Count);
@@ -294,7 +309,7 @@ if any(hasTemp)
     pcshow(pcViewTempValid.Location, pcViewTempValid.Intensity, 'MarkerSize', markerSize);
     xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
     title(sprintf('Temperatura media per voxel (%.0f cm) - %d pose fusi', ...
-        voxelSize*100, nT), 'Color', 'w', 'Interpreter', 'none');
+        voxelSizeTemp*100, nT), 'Color', 'w', 'Interpreter', 'none');
     axis equal;
     grid on;
     colormap(gca, hot);
@@ -314,18 +329,23 @@ end
 % Disegna ogni voxel occupato come un cubo vero, colorato con la temperatura
 % media dei punti che ci cadono dentro, con trasparenza.
 %
-% NOTA sulla dimensione: a 1 cm i voxel occupati sono ~570k, e altrettanti
-% cubi con trasparenza non sono renderizzabili (MATLAB si pianta). Questa
-% vista usa quindi un voxel PIU' GROSSO, indipendente da voxelSize, da
-% regolare con voxelSizeCubes qui sotto. 10 cm da' ~10-15k cubi (fluido),
-% 5 cm ~40-50k (pesante ma fattibile).
+% Stessa soglia di sezione 9: il colore per voxel viene da punti la cui
+% corrispondenza LiDAR->camera ha ~9 cm RMSE di incertezza, quindi il cubo
+% non dovrebbe essere piu' piccolo di quello. Di default e' quindi uguale a
+% voxelSizeTemp, non un valore indipendente scelto solo per la resa.
+%
+% A 1 cm i voxel occupati sarebbero ~570k, comunque non renderizzabili con
+% la trasparenza attiva (MATLAB si pianta) -- ma non e' quello il motivo
+% principale per cui questa vista non scende sotto i 15 cm.
 %
 % Ottimizzazione: le facce condivise tra due voxel adiacenti entrambi
 % occupati vengono scartate (face culling). Serve sia per le prestazioni
 % sia per la resa: con la trasparenza attiva, le facce interne nascoste si
 % sommerebbero visivamente rendendo tutto opaco e confuso.
 
-voxelSizeCubes = 0.05;   % m, lato del cubo per QUESTA vista (non tocca voxelSize)
+voxelSizeCubes = voxelSizeTemp;   % m, lato del cubo. Cambiarlo qui lo scollega dal
+                                   % ragionamento sulla soglia di rumore qui sopra,
+                                   % non solo dal valore di default.
 cubeAlpha      = 0.5;   % 0 = invisibile, 1 = opaco
 cubeEdges      = false;  % true = disegna gli spigoli (leggibile solo con pochi voxel)
 
