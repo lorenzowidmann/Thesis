@@ -76,7 +76,7 @@ pc = pointCloud(xyz);
 % Mettere useROI = false per disattivarlo e vedere la nuvola intera.
 useROI = true;
 roi = [11.5 21, ...    % X min max
-       -1.0 1.5, ...    % Y min max
+       -1 1.5, ...    % Y min max
        -Inf 4.0];       % Z min max, taglia sopra i 4 m
 
 if useROI
@@ -148,15 +148,20 @@ colormap(gca, turbo);   % colore in funzione della quota Z
 % script per le fonti Obsidian dei parametri).
 %
 % Usa lo stesso pc (post ROI+denoise, PRIMA del downsample) della vista
-% principale, ma per il BINNING finale usa un voxel proprio (voxelSizeTemp),
-% non voxelSize: qui il colore di ogni punto viene da una riproiezione
+% principale. Il colore di ogni punto viene da una riproiezione
 % LiDAR->camera (T_lidar_to_flir), che ha un errore composto di ~9 cm RMSE
 % (5.8 cm lidar->flir + 6.8 cm lidar->zed, vedi rig_calibration.yaml, PRIMA
 % della deriva SLAM) su QUALE pixel un dato punto sta davvero campionando.
-% Un voxel piu' piccolo di quell'errore non recupera dettaglio reale: mostra
-% il rumore di corrispondenza incrociata come se fosse struttura. 15 cm
-% (~1.6x il RMSE) resta un margine ragionevole sopra quella soglia; sotto i
-% ~10-12 cm il margine sparisce, sotto i 9 cm si e' sotto la soglia stessa.
+% Un valore per-punto piu' fine di quell'errore non e' affidabile: mostra il
+% rumore di corrispondenza incrociata come se fosse struttura. Per questo,
+% DOPO il calcolo di temperature (loop multi-pose qui sotto, invariato), si
+% fa un secondo passaggio di media -- stavolta tra punti VICINI, non tra
+% pose dello stesso punto -- sul voxel voxelSizeTemp (15 cm, ~1.6x il RMSE),
+% e il risultato stabilizzato viene ridistribuito ("broadcast") a ogni punto
+% per la visualizzazione fine (sez. 9-10 piu' sotto). voxelSizeTemp NON e'
+% quindi piu' la densita' di visualizzazione: e' solo la granularita' del
+% valore di fiducia. La densita' mostrata la decide voxelSize (Figura 1/2,
+% punti) o voxelSizeCubes (Figura 3, cubi), indipendentemente.
 %
 % useCorrectedTemp = true legge la temperatura CORRETTA prodotta da
 % RadiometricCalibration/correct_session.py (emissivita' + atmosfera, con i
@@ -172,7 +177,11 @@ colormap(gca, turbo);   % colore in funzione della quota Z
 
 useCorrectedTemp = true;    % false = temperatura apparente grezza (comportamento originale)
 correctedName    = 'corrected_temperature_consensus.npy';
-voxelSizeTemp    = 0.15;    % m, binning delle viste a temperatura (sez. 9-10). Non
+voxelSizeTemp    = 0.15;    % m, granularita' del POOLING statistico (non piu' del
+                             % display): la temperatura per-punto (multi-pose) viene
+                             % qui mediata anche tra punti vicini per stabilizzarla,
+                             % poi il risultato e' ridistribuito ai punti/cubi fini
+                             % mostrati in Figura 2 e 3 (vedi sez. 9-10). Non
                              % scendere sotto ~0.10-0.12 senza anche stringere
                              % zBufferTol_m: sono due fonti di errore comparabili
                              % che si sommano, non indipendenti.
@@ -296,69 +305,121 @@ else
     tempLabel = 'Temperatura (°C, dato radiometrico FLIR grezzo)';
 end
 
-pcTemp = pointCloud(xyzFilt, 'Intensity', temperature);
-pcViewTemp = pcdownsample(pcTemp, 'gridAverage', voxelSizeTemp);
+% --- Pooling statistico su voxel grossolano + broadcast ---
+% temperature (sopra) e' gia' la media multi-pose per singolo punto e non va
+% toccata. Qui si aggiunge un SECONDO livello di media, stavolta tra punti
+% vicini diversi che cadono nello stesso voxel da voxelSizeTemp (15 cm,
+% soglia di fiducia spiegata al commento di voxelSizeTemp piu' sopra), per
+% stabilizzare ulteriormente il valore prima di mostrarlo. Stesso idioma
+% floor+unique+accumarray gia' usato in sez. 10 per i cubi.
+%
+% Il broadcast e' valido perche' floor(xyzFilt/voxelSize) e
+% floor(xyzFilt/voxelSizeTemp) sono calcolati sulla STESSA xyzFilt, stessa
+% origine, nessuno shift: dato che voxelSizeTemp/voxelSize = 15 e' un intero
+% esatto, ogni cella fine da voxelSize cade interamente dentro una sola
+% cella grossolana da voxelSizeTemp (i bordi grossolani coincidono sempre
+% con bordi fini, mai a meta' cella). Tutti i punti di una cella fine
+% condividono quindi per costruzione lo stesso valore stabilizzato: il
+% gridAverage di Figura 2 su quei valori e' un no-op sul colore (vedi sotto).
+validT = isfinite(temperature);
+ivTrust = floor(xyzFilt(validT,:) / voxelSizeTemp);
+[ivTrustU, ~, icTrust] = unique(ivTrust, 'rows');
+meanTrust = accumarray(icTrust, temperature(validT), [], @mean);
+nVoxTrust = size(ivTrustU, 1);
+fprintf('Voxel di pooling statistico (%.0f cm): %d, punti pooled: %d\n', ...
+    voxelSizeTemp*100, nVoxTrust, sum(validT));
+
+temperatureStable = nan(nPts, 1);
+temperatureStable(validT) = meanTrust(icTrust);
+
+% pcTemp usa il colore GIA' stabilizzato (temperatureStable, media pooled su
+% voxel da voxelSizeTemp), ma il downsample per la VISUALIZZAZIONE riusa
+% voxelSize (stesso valore di Figura 1, sez. 8): densita' fine, colore a
+% fiducia grossa. Dentro ogni cella da voxelSize, tutti i punti condividono
+% per costruzione lo stesso temperatureStable (vedi nota sopra): il
+% gridAverage qui sotto media valori identici, quindi dirada i punti come
+% in Figura 1 senza alterare il colore.
+pcTemp = pointCloud(xyzFilt, 'Intensity', temperatureStable);
+pcViewTemp = pcdownsample(pcTemp, 'gridAverage', voxelSize);
 
 hasTemp = isfinite(pcViewTemp.Intensity);
-fprintf('Voxel con temperatura media valida: %d / %d\n', sum(hasTemp), pcViewTemp.Count);
+fprintf('Punti mostrati (voxel %.0f cm) con temperatura stabilizzata valida: %d / %d\n', ...
+    voxelSize*100, sum(hasTemp), pcViewTemp.Count);
 
 if any(hasTemp)
     pcViewTempValid = select(pcViewTemp, find(hasTemp));
 
-    figure('Name', sprintf('Temperatura FLIR su voxel - %d pose', nT), 'Color', 'k');
+    figure('Name', sprintf('Temperatura FLIR - punti %.0f cm, colore stabilizzato %.0f cm - %d pose', ...
+        voxelSize*100, voxelSizeTemp*100, nT), 'Color', 'k');
     pcshow(pcViewTempValid.Location, pcViewTempValid.Intensity, 'MarkerSize', markerSize);
     xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
-    title(sprintf('Temperatura media per voxel (%.0f cm) - %d pose fusi', ...
-        voxelSizeTemp*100, nT), 'Color', 'w', 'Interpreter', 'none');
+    title(sprintf('Punti a %.0f cm, colore stabilizzato su voxel da %.0f cm - %d pose fuse', ...
+        voxelSize*100, voxelSizeTemp*100, nT), 'Color', 'w', 'Interpreter', 'none');
     axis equal;
     grid on;
     colormap(gca, hot);
     cb = colorbar;
     cb.Color = 'w';
-    cb.Label.String = tempLabel;
+    cb.Label.String = [tempLabel, sprintf(' - stabilizzata su voxel %.0f cm', voxelSizeTemp*100)];
     cb.Label.Color = 'w';
 
     tVals = pcViewTempValid.Intensity;
-    fprintf('Temperatura media per voxel: min=%.1f  media=%.1f  max=%.1f  [gradi, unita'' del dato .npy]\n', ...
+    fprintf('Temperatura stabilizzata mostrata: min=%.1f  media=%.1f  max=%.1f  [gradi, unita'' del dato .npy]\n', ...
         min(tVals), mean(tVals), max(tVals));
 else
-    warning('Nessun voxel con temperatura valida su tutta la sessione.');
+    warning('Nessun punto con temperatura stabilizzata valida su tutta la sessione.');
 end
 
 %% 10. Voxel come cubi trasparenti (non solo un punto al centro)
-% Disegna ogni voxel occupato come un cubo vero, colorato con la temperatura
-% media dei punti che ci cadono dentro, con trasparenza.
+% Disegna ogni voxel occupato come un cubo vero. Come per la Figura 2 (sez.
+% 9), la GEOMETRIA (dimensione del cubo) e' ora disaccoppiata dalla
+% FIDUCIA STATISTICA del colore: ogni cubo prende colore dalla media di
+% temperatureStable dei punti al suo interno, e temperatureStable e' gia'
+% stata stabilizzata sul voxel grossolano voxelSizeTemp (15 cm, vedi sez. 9
+% sopra) PRIMA di arrivare qui. Cubi adiacenti che ricadono nello stesso
+% voxel da voxelSizeTemp mostrano quindi legittimamente lo stesso colore:
+% e' il punto di questa vista, non un artefatto.
 %
-% Stessa soglia di sezione 9: il colore per voxel viene da punti la cui
-% corrispondenza LiDAR->camera ha ~9 cm RMSE di incertezza, quindi il cubo
-% non dovrebbe essere piu' piccolo di quello. Di default e' quindi uguale a
-% voxelSizeTemp, non un valore indipendente scelto solo per la resa.
-%
-% A 1 cm i voxel occupati sarebbero ~570k, comunque non renderizzabili con
-% la trasparenza attiva (MATLAB si pianta) -- ma non e' quello il motivo
-% principale per cui questa vista non scende sotto i 15 cm.
+% voxelSizeCubes governa SOLO la densita' geometrica dei cubi mostrati, non
+% piu' la soglia di rumore (quel ruolo e' ora di voxelSizeTemp, sopra). Il
+% limite che conta qui e' la renderizzabilita' con la trasparenza attiva: a
+% 1 cm i voxel occupati sarebbero ~570k e MATLAB si pianta; ~40-50k cubi
+% (5 cm) e' pesante ma fattibile; ~10-15k cubi (10 cm) e' fluido.
 %
 % Ottimizzazione: le facce condivise tra due voxel adiacenti entrambi
 % occupati vengono scartate (face culling). Serve sia per le prestazioni
 % sia per la resa: con la trasparenza attiva, le facce interne nascoste si
 % sommerebbero visivamente rendendo tutto opaco e confuso.
 
-voxelSizeCubes = voxelSizeTemp;   % m, lato del cubo. Cambiarlo qui lo scollega dal
-                                   % ragionamento sulla soglia di rumore qui sopra,
-                                   % non solo dal valore di default.
-cubeAlpha      = 0.5;   % 0 = invisibile, 1 = opaco
+voxelSizeCubes = 0.05;   % m, lato del cubo per la VISUALIZZAZIONE (densita'
+                          % geometrica). NON e' piu' legato a voxelSizeTemp: quello
+                          % resta la soglia di fiducia del colore (vedi sopra),
+                          % questo e' solo un compromesso resa/dettaglio.
+cubeAlpha      = 1;   % 0 = invisibile, 1 = opaco
 cubeEdges      = false;  % true = disegna gli spigoli (leggibile solo con pochi voxel)
 
-fprintf('\n--- Voxel come cubi trasparenti (%.0f cm) ---\n', voxelSizeCubes*100);
+fprintf('\n--- Voxel come cubi trasparenti: geometria %.0f cm, colore stabilizzato %.0f cm ---\n', ...
+    voxelSizeCubes*100, voxelSizeTemp*100);
 
-validT = isfinite(temperature);
+% validT e' gia' stato calcolato in sez. 9 (isfinite(temperature)): stesso
+% identico insieme di punti, riusato qui senza ricalcolo. L'unica differenza
+% rispetto a prima e' la SORGENTE dei valori: tAll viene ora da
+% temperatureStable (gia' mediata sul voxel da voxelSizeTemp), non dal
+% temperature grezzo per-punto -- quindi ogni cubo mostra il colore
+% stabilizzato, alla densita' geometrica fine di voxelSizeCubes. Un cubo che
+% si trovasse a cavallo di due voxel di voxelSizeTemp (possibile solo se
+% voxelSizeTemp non e' un multiplo esatto di voxelSizeCubes) prenderebbe
+% semplicemente la media dei valori gia' stabilizzati dei suoi punti: nessun
+% crash o discontinuita' visiva, solo una miscela locale tra due medie
+% vicine.
 ivAll = floor(xyzFilt(validT,:) / voxelSizeCubes);      % coordinate intere di voxel
-tAll  = temperature(validT);
+tAll  = temperatureStable(validT);
 
 [ivU, ~, ic] = unique(ivAll, 'rows');
-meanT = accumarray(ic, tAll, [], @mean);                % temperatura media per voxel
+meanT = accumarray(ic, tAll, [], @mean);                % media (valori gia' stabilizzati) per voxel di visualizzazione
 nVox = size(ivU, 1);
-fprintf('Voxel occupati: %d\n', nVox);
+fprintf('Voxel occupati (geometria %.0f cm, colore stabilizzato %.0f cm): %d\n', ...
+    voxelSizeCubes*100, voxelSizeTemp*100, nVox);
 
 % --- geometria: 8 vertici e 6 facce per voxel, vettorizzato ---
 % Corner locale del cubo unitario, poi scalato e traslato sul voxel
@@ -396,8 +457,8 @@ faceColors = vertcat(colorVis{:});
 fprintf('Facce totali: %d, visibili dopo culling: %d (%.0f%% scartate)\n', ...
     nVox*6, size(faces,1), 100*(1 - size(faces,1)/(nVox*6)));
 
-figure('Name', sprintf('Voxel cubi trasparenti %.0f cm - %d pose', ...
-    voxelSizeCubes*100, nT), 'Color', 'k');
+figure('Name', sprintf('Cubi %.0f cm, colore stabilizzato %.0f cm - %d pose', ...
+    voxelSizeCubes*100, voxelSizeTemp*100, nT), 'Color', 'k');
 if cubeEdges
     edgeArg = {'EdgeColor', [0.25 0.25 0.25], 'LineWidth', 0.1};
 else
@@ -411,18 +472,18 @@ ax = gca;
 ax.Color = 'k';
 ax.XColor = 'w'; ax.YColor = 'w'; ax.ZColor = 'w';
 xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
-title(sprintf('Voxel %.0f cm come cubi trasparenti (alpha %.2f) - %d pose fusi', ...
-    voxelSizeCubes*100, cubeAlpha, nT), 'Color', 'w');
+title(sprintf('Cubi a %.0f cm, colore stabilizzato su voxel da %.0f cm (alpha %.2f) - %d pose fuse', ...
+    voxelSizeCubes*100, voxelSizeTemp*100, cubeAlpha, nT), 'Color', 'w');
 axis equal; grid on; view(3);
 colormap(ax, hot);
 cbc = colorbar;
 cbc.Color = 'w';
-cbc.Label.String = tempLabel;
+cbc.Label.String = [tempLabel, sprintf(' - stabilizzata su voxel %.0f cm', voxelSizeTemp*100)];
 cbc.Label.Color = 'w';
 camlight headlight; lighting none;   % niente shading: il colore e' il dato, non la luce
 
-fprintf('Temperatura per voxel (%.0f cm): min=%.1f  media=%.1f  max=%.1f\n', ...
-    voxelSizeCubes*100, min(meanT), mean(meanT), max(meanT));
+fprintf('Temperatura stabilizzata sui cubi (geometria %.0f cm, colore stabilizzato %.0f cm): min=%.1f  media=%.1f  max=%.1f\n', ...
+    voxelSizeCubes*100, voxelSizeTemp*100, min(meanT), mean(meanT), max(meanT));
 
 %% --- Funzioni locali ---
 
