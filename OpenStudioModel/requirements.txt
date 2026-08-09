@@ -1,0 +1,11 @@
+# venv: C:\venvs\planefit (Python 3.12 -- open3d has no cp313 wheel as of
+# open3d 0.19.0, and every other venv in this repo runs Python 3.13.14, so
+# this module needs its own 3.12 interpreter).
+#
+#   py -3.12 -m venv C:\venvs\planefit
+#   C:\venvs\planefit\Scripts\python.exe -m pip install -r requirements.txt
+rosbags
+open3d
+opencv-python
+numpy
+scipy
