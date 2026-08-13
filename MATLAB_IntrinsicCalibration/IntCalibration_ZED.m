@@ -7,7 +7,7 @@ clc
 close all
 
 %% 1. Load images (png, non-recursive by default)
-folderPath = 'C:\Users\loren\Desktop\Dati_vfinal\Calibration\ZedInt\SmallCheck1080p - 25 mm';
+folderPath = "C:\Users\loren\Desktop\Dati_vfinal\Calibration\ZedInt\SmallCheck1080p - 25 mm";
 imageFiles = dir(fullfile(folderPath, '*.png'));
 imagePaths = fullfile({imageFiles.folder}, {imageFiles.name});
 fprintf('Found %d images in %s\n', numel(imagePaths), folderPath);
