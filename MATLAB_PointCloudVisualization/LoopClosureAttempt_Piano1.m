@@ -21,7 +21,7 @@ close all
 clc
 
 %% 1. Parametri
-bagPath = 'C:\Users\loren\Desktop\Dati_vfinal\SLAM\Lidar\rosbag2_2026_07_30-17_50_45';
+bagPath = "C:\Users\loren\Desktop\Dati_vfinal\SLAM\Lidar\rosbag2_2026_07_30-18_02_41\rosbag2_2026_07_30-18_02_41_0.db3";
 
 % Selezione keyframe: un nuovo keyframe quando ci si e' spostati di
 % kfDistance metri OPPURE ruotati di kfAngle gradi rispetto al precedente.

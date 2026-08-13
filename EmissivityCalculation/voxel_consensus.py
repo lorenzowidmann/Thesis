@@ -73,6 +73,15 @@ def load_emissivity(path=DEFAULT_TABLE) -> dict:
         return {r["material"]: float(r["emissivity"]) for r in csv.DictReader(f)}
 
 
+def load_solar_absorptance(path=DEFAULT_TABLE) -> dict:
+    """material -> solar_absorptance. Same stdlib-csv rationale as load_emissivity.
+    Fraction of incident shortwave (sunlight) the material absorbs -- what
+    lets a sun-exposed voxel run hotter than a passive conduction model
+    predicts (see voxel_u_value.py's solar_suspected/solar_possible flags)."""
+    with open(path, newline="", encoding="utf-8") as f:
+        return {r["material"]: float(r["solar_absorptance"]) for r in csv.DictReader(f)}
+
+
 def parse_args():
     p = argparse.ArgumentParser(description="Multi-view material consensus / 3-D thermal map")
     p.add_argument("--stage", choices=("vote", "thermal"), required=True)
@@ -299,6 +308,7 @@ def stage_thermal(args, cal, session_dir, triplets):
     emis_dir = Path(args.emissivity_map_dir) if args.emissivity_map_dir else session_dir / "emissivity_map"
     material_dir = Path(args.material_map_dir) if args.material_map_dir else session_dir / "material_map_consensus"
     out_dir = Path(args.out_dir) if args.out_dir else session_dir / "voxel_map"
+    alpha_of = load_solar_absorptance()
 
     work = [t for t in frames_with(session_dir, emis_dir, triplets)
             if (emis_dir / Path(t["flir"]["file"]).stem / args.corrected_name).exists()]
@@ -363,6 +373,7 @@ def stage_thermal(args, cal, session_dir, triplets):
     for key, (s1, s2, n) in acc.items():
         mean = s1 / n
         var = max(0.0, s2 / n - mean * mean)
+        material = mat[key].most_common(1)[0][0] if mat.get(key) else ""
         rows.append({
             "x": (key[0] + 0.5) * args.voxel,
             "y": (key[1] + 0.5) * args.voxel,
@@ -370,7 +381,8 @@ def stage_thermal(args, cal, session_dir, triplets):
             "t_mean_c": round(mean, 3),
             "t_std_c": round(var ** 0.5, 3),
             "n_obs": n,
-            "material": mat[key].most_common(1)[0][0] if mat.get(key) else "",
+            "material": material,
+            "solar_absorptance": alpha_of.get(material, "") if material else "",
         })
     rows.sort(key=lambda r: (r["x"], r["y"], r["z"]))
 
@@ -404,6 +416,10 @@ def stage_thermal(args, cal, session_dir, triplets):
     print(f"within-voxel spread: median std {np.median(std):.2f} degC, mean {std.mean():.2f}")
     if any(r["material"] for r in rows):
         print("materials:", Counter(r["material"] for r in rows if r["material"]).most_common(6))
+    alpha = np.array([r["solar_absorptance"] for r in rows if r["solar_absorptance"] != ""])
+    if alpha.size:
+        print(f"solar absorptance: {alpha.min():.2f} .. {alpha.max():.2f}, mean {alpha.mean():.2f} "
+              f"({alpha.size}/{len(rows)} voxels with a consensus material)")
     print(f"\nDone. {csv_path}\n      {ply_path}")
     return 0
 

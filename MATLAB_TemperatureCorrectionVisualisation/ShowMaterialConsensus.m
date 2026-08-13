@@ -32,7 +32,7 @@ close all
 clc
 
 %% 1. Parametri
-sessionDir = 'C:\Users\loren\Desktop\Dati_vfinal\SLAM\ZED\20260730_161223\fullrate';
+sessionDir = "C:\Users\loren\Desktop\Dati_vfinal\SLAM\ZED\20260730_161223\fullrate";   % sessione 6
 mapDir     = '';   % vuoto = <sessionDir>\material_map_consensus
 
 if nargin >= 1 && ~isempty(sessionDirIn)

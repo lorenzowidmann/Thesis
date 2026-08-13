@@ -83,6 +83,19 @@ def main():
                     help="xmin,xmax,ymin,ymax,zmin,zmax to frame the camera on, overriding the "
                          "default (plane bounds, padded by --pad) -- pass the bounds printed by "
                          "one render to another so both match exactly")
+    ap.add_argument("--north-offset-deg", type=float, default=None,
+                    help="draw a red 'N' arrow above the scene, using sun_incidence.py's "
+                         "convention: true compass bearing of the local +Y axis. Local north "
+                         "direction = bearing (-north_offset_deg mod 360) in the local XY plane. "
+                         "Purely a QA overlay to sanity-check the offset against a known map/photo "
+                         "-- not written to any output.")
+    ap.add_argument("--top-view", action="store_true",
+                    help="camera straight down (plan view) instead of iso -- directly comparable "
+                         "to a north-up satellite/map screenshot, use with --north-offset-deg")
+    ap.add_argument("--north-up", action="store_true",
+                    help="with --top-view and --north-offset-deg: rotate the camera so true "
+                         "north (not local +Y) renders vertical -- the corridor then appears "
+                         "tilted by the offset, exactly like it does in a north-up satellite photo")
     ap.add_argument("--out", type=Path, default=Path("planes_view.png"))
     args = ap.parse_args()
 
@@ -150,6 +163,23 @@ def main():
             loop = np.vstack([corners, corners[0]])
             p.add_lines(loop, color="black", width=3, connected=True)
 
+    if args.north_offset_deg is not None and planes:
+        allc = np.array([c for pl in planes for c in pl["corners_3d"]])
+        lo, hi = allc.min(axis=0), allc.max(axis=0)
+        diag = float(np.linalg.norm(hi - lo))
+        theta = np.radians((-args.north_offset_deg) % 360.0)
+        north_dir = np.array([np.sin(theta), np.cos(theta), 0.0])  # local bearing -> XY vector
+        arrow_len = diag * 0.15
+        origin = np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, hi[2] + diag * 0.05])
+        arrow = pv.Arrow(start=origin, direction=north_dir, scale=arrow_len)
+        p.add_mesh(arrow, color="red")
+        p.add_point_labels([origin + north_dir * arrow_len * 1.2], ["N"],
+                           font_size=28, text_color="red", shape_opacity=0.0,
+                           always_visible=True, show_points=False)
+        print(f"north arrow: local direction {north_dir.round(3).tolist()} "
+              f"(bearing {(-args.north_offset_deg) % 360.0:.1f} deg in local frame, "
+              f"north_offset_deg={args.north_offset_deg})")
+
     if planes and not args.no_labels:
         centers = np.array([pl["center_3d"] for pl in planes])
         tags = [f"{pl['id']}: {pl.get('orientation', '?')} {pl.get('tilt_deg', float('nan')):.0f}deg"
@@ -158,8 +188,16 @@ def main():
         p.add_point_labels(centers, tags, point_size=1, font_size=14,
                            text_color="black", shape_opacity=0.6, always_visible=True)
 
+    if args.north_up and args.north_offset_deg is None:
+        raise SystemExit("--north-up needs --north-offset-deg")
+
     p.set_background("white")
-    p.camera_position = "iso"
+    p.camera_position = "xy" if args.top_view else "iso"
+    if args.top_view:
+        if args.north_up:
+            p.camera.up = tuple(north_dir)  # true north vertical -- corridor renders tilted
+        else:
+            p.camera.up = (0.0, 1.0, 0.0)  # local +Y up, matching the north-arrow convention
     # Frame explicitly instead of relying on "iso"'s auto-fit, which fits to whatever's in
     # the scene -- a stray, loosely-connected part of the building can survive --declutter
     # and blow the cloud's bounding box out far past the corridor, so framing on raw cloud

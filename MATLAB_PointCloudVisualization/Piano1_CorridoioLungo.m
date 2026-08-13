@@ -75,7 +75,7 @@ pc = pointCloud(xyz);
 % tra loro e quindi non risultano "isolati".
 % Mettere useROI = false per disattivarlo e vedere la nuvola intera.
 useROI = true;
-roi = [11.5 21, ...    % X min max
+roi = [-Inf Inf, ...    % X min max
        -1 1.5, ...    % Y min max
        -Inf 4.0];       % Z min max, taglia sopra i 4 m
 

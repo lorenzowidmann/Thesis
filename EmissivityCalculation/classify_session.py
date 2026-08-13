@@ -357,6 +357,7 @@ def main():
                 "top_material": material,
                 "confidence": confidence,
                 "emissivity": rec.emissivity,
+                "solar_absorptance": rec.solar_absorptance,
                 "top_k": [(m, c) for m, c in ranked[:args.top_k]],
             }
             if args.zone_constraint:

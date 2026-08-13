@@ -59,7 +59,17 @@ def zone_of(segment: dict, image_height: int, image_width: int) -> str:
 
     if cy > 0.55 and bw > 1.6 * bh and touches_bottom and fill > 0.5:
         return "floor"
-    if cy < 0.30 and bw > 1.6 * bh:
+    # 0.8, not 1.6: with --crop-to-flir-fov (the default), the crop keeps
+    # ~39% of the frame's width but ~68% of its height (session 9/6 rig:
+    # 751x733 px out of 1920x1080), so a real ceiling patch loses most of
+    # the "wide" shape a full, uncropped frame would give it -- 1.6 was
+    # tuned for the uncropped case and let ~110 real ceiling segments (this
+    # session alone) fall through to "any" misclassified as glass, since
+    # "any"'s emissivity gate only blocks bare metal (eps<0.5), not glass
+    # (eps=0.92). Measured on this rig's actual segments: true window
+    # ("vertical") segments with cy<0.30 top out at bw/bh=0.768; the missed
+    # ceiling candidates start at 0.769 -- a clean, zero-overlap split.
+    if cy < 0.30 and bw > 0.8 * bh:
         return "ceiling"
     if bh > 1.3 * bw:
         return "vertical"

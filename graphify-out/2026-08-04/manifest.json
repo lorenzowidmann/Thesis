@@ -1,0 +1,667 @@
+{
+  "Calibration/FlirAltriFiles/Diagnostic/flir_diagnostic.json": {
+    "mtime": 1785163019.7623334,
+    "ast_hash": "f6eed91bfb5ad065e01d710c5356e52d",
+    "semantic_hash": ""
+  },
+  "Calibration/FlirAltriFiles/Diagnostic/flir_diagnostic_sel2.json": {
+    "mtime": 1785163202.5989048,
+    "ast_hash": "dc8e1afa48b1d8b97b6418e35dee9be7",
+    "semantic_hash": ""
+  },
+  "Calibration/FlirAltriFiles/flir_Selezionate1_minimal.json": {
+    "mtime": 1785163614.595098,
+    "ast_hash": "902b1b39903d846e64acbb4d4258ac4f",
+    "semantic_hash": ""
+  },
+  "Calibration/FlirAltriFiles/flir_Selezionate2_minimal.json": {
+    "mtime": 1785168468.378809,
+    "ast_hash": "8d4103e01a623023ef7ab835239cd83f",
+    "semantic_hash": ""
+  },
+  "Calibration/FlirAltriFiles/flir_intrinsics.json": {
+    "mtime": 1785181803.2526622,
+    "ast_hash": "f00bbf28c6e88363c2ddc1b050e0222f",
+    "semantic_hash": ""
+  },
+  "Calibration/FlirAltriFiles/flir_intrinsics_minimal.json": {
+    "mtime": 1785163496.919286,
+    "ast_hash": "fdd08afc07158c19deb330e2c1bdb613",
+    "semantic_hash": ""
+  },
+  "Calibration/capture_zed_right.py": {
+    "mtime": 1784728130.6473038,
+    "ast_hash": "18e31f83b38b37513555af41dd3931e8",
+    "semantic_hash": ""
+  },
+  "Calibration/check_bag_rate.py": {
+    "mtime": 1785661262.1916685,
+    "ast_hash": "1aa6d73541b93bc8084c5348dca1937b",
+    "semantic_hash": ""
+  },
+  "Calibration/detect_board_poses.py": {
+    "mtime": 1785361560.2440302,
+    "ast_hash": "416c0e8702a89f6296d8a9cb82a91b9e",
+    "semantic_hash": ""
+  },
+  "Calibration/diagnose_flir_calib.py": {
+    "mtime": 1785162853.9683626,
+    "ast_hash": "89460fcb47a6c9c60765759a9775896e",
+    "semantic_hash": ""
+  },
+  "Calibration/export_livox_cloud.py": {
+    "mtime": 1785662026.9989078,
+    "ast_hash": "fbd1f7ffeef10ed83ab0885c97387f20",
+    "semantic_hash": ""
+  },
+  "Calibration/flir_intrinsic_calib.py": {
+    "mtime": 1785163487.978882,
+    "ast_hash": "4605cbbe29cc81b30bc727a111f14caa",
+    "semantic_hash": ""
+  },
+  "Calibration/flir_intrinsics.json": {
+    "mtime": 1785182356.4882631,
+    "ast_hash": "2ef647d8867910db874f758be6bb7611",
+    "semantic_hash": ""
+  },
+  "Calibration/flir_pose_check.py": {
+    "mtime": 1785361496.2992034,
+    "ast_hash": "21f1dbf90d183fa1dd5fb30ba8caa2d2",
+    "semantic_hash": ""
+  },
+  "Calibration/generate_board_template.py": {
+    "mtime": 1785333251.8016486,
+    "ast_hash": "6cbf528b9c065a6b1b6d798f8a639dd4",
+    "semantic_hash": ""
+  },
+  "Calibration/zed_intrinsic_calib.py": {
+    "mtime": 1784970506.491439,
+    "ast_hash": "616f0765fdad557ef6f29ebc3dacba31",
+    "semantic_hash": ""
+  },
+  "Calibration/zed_right_intrinsics.json": {
+    "mtime": 1785405367.7470617,
+    "ast_hash": "97452e239e3e74041b8188de2509489f",
+    "semantic_hash": ""
+  },
+  "CameraServer/camera_server.py": {
+    "mtime": 1784722525.5197585,
+    "ast_hash": "3d1a3a67684d29d41f80ce068558dcfa",
+    "semantic_hash": ""
+  },
+  "CameraServer/shared_frame.py": {
+    "mtime": 1784722533.7017522,
+    "ast_hash": "e547dc1806ade6fe493d6b0f9eaf9990",
+    "semantic_hash": ""
+  },
+  "DriveView/drive_view.py": {
+    "mtime": 1784722584.4454086,
+    "ast_hash": "b578b2980920a4c0e5b40decc4c6ca9b",
+    "semantic_hash": ""
+  },
+  "EmissivityCalculation/emissivity/__init__.py": {
+    "mtime": 1784117483.224611,
+    "ast_hash": "03e7cc0a8f7e97c2eeca7715419b5621",
+    "semantic_hash": ""
+  },
+  "EmissivityCalculation/emissivity/classifier.py": {
+    "mtime": 1784290621.2979245,
+    "ast_hash": "f4d6ebf7d31d9c8feab834d07457f4dd",
+    "semantic_hash": ""
+  },
+  "EmissivityCalculation/emissivity/sources.py": {
+    "mtime": 1784722673.37716,
+    "ast_hash": "071ee65fb5132e21f015e8f8afd1258b",
+    "semantic_hash": ""
+  },
+  "EmissivityCalculation/emissivity/table.py": {
+    "mtime": 1783603045.6242478,
+    "ast_hash": "27afe79f56a5799858111aed3109e4e5",
+    "semantic_hash": ""
+  },
+  "EmissivityCalculation/main.py": {
+    "mtime": 1784290966.211478,
+    "ast_hash": "0c978511a193beaa03945bd3daede976",
+    "semantic_hash": ""
+  },
+  "LVTCalibUpdate/flir_frame_publisher/scripts/flir_frame_publisher.py": {
+    "mtime": 1785353614.2096121,
+    "ast_hash": "0bc3e4adb2a30040d87efe8aaf406235",
+    "semantic_hash": ""
+  },
+  "LVTCalibUpdate/zed_frame_publisher/scripts/zed_frame_publisher.py": {
+    "mtime": 1785353614.0608132,
+    "ast_hash": "f72d310d4e9adc330550cc9229706a1d",
+    "semantic_hash": ""
+  },
+  "LidarDistance/livox/__init__.py": {
+    "mtime": 1784292265.6188083,
+    "ast_hash": "ce3ffd6cb6430fbef99ac1c247d3479e",
+    "semantic_hash": ""
+  },
+  "LidarDistance/livox/control.py": {
+    "mtime": 1784292253.1659112,
+    "ast_hash": "cda46a6d3585af4c07e8a8416b3af58d",
+    "semantic_hash": ""
+  },
+  "LidarDistance/livox/geometry.py": {
+    "mtime": 1784195125.6722107,
+    "ast_hash": "ef4d0eaf0364abba5f839e2e4cda0fcb",
+    "semantic_hash": ""
+  },
+  "LidarDistance/livox/packets.py": {
+    "mtime": 1784187802.7416177,
+    "ast_hash": "11ecb504c6654ae2efb7adaeb96e301f",
+    "semantic_hash": ""
+  },
+  "LidarDistance/livox/receiver.py": {
+    "mtime": 1784187826.639548,
+    "ast_hash": "2dc25c12942bb3a2653b25067496442e",
+    "semantic_hash": ""
+  },
+  "LidarDistance/main.py": {
+    "mtime": 1784292292.8795867,
+    "ast_hash": "919910703485af0943f549ecbc8806b4",
+    "semantic_hash": ""
+  },
+  "MATLAB_IntrinsicCalibration/IntCalibration_Flir.m": {
+    "mtime": 1785684023.9907396,
+    "ast_hash": "2f10f866264e77b62f0e166b21ac6530",
+    "semantic_hash": ""
+  },
+  "MATLAB_IntrinsicCalibration/IntCalibration_ZED.m": {
+    "mtime": 1785535204.1390383,
+    "ast_hash": "4376df34b87e4aeb046597d587949221",
+    "semantic_hash": ""
+  },
+  "MATLAB_PointCloudVisualization/CompareLoopEffect.m": {
+    "mtime": 1785594366.9920588,
+    "ast_hash": "a2992b381690aaa5270888613393650b",
+    "semantic_hash": ""
+  },
+  "MATLAB_PointCloudVisualization/DiagBodyZ.m": {
+    "mtime": 1785593032.6573029,
+    "ast_hash": "dae68d27d21462be3f4eb1ef808f51cb",
+    "semantic_hash": ""
+  },
+  "MATLAB_PointCloudVisualization/DiagDrift.m": {
+    "mtime": 1785592781.3159142,
+    "ast_hash": "867b29c86b4c7b1dfb462ea60c530e04",
+    "semantic_hash": ""
+  },
+  "MATLAB_PointCloudVisualization/DiagFloor.m": {
+    "mtime": 1785593093.5446293,
+    "ast_hash": "f90d650fbe88ae7b1fd62673d500fd38",
+    "semantic_hash": ""
+  },
+  "MATLAB_PointCloudVisualization/DiagFloorGaps.m": {
+    "mtime": 1785593825.9747062,
+    "ast_hash": "2c2504d6303c96ab19dd460a440f16bc",
+    "semantic_hash": ""
+  },
+  "MATLAB_PointCloudVisualization/DiagLoopFull.m": {
+    "mtime": 1785592541.118808,
+    "ast_hash": "55bd3515e0e9c525cfb7295de478aa5e",
+    "semantic_hash": ""
+  },
+  "MATLAB_PointCloudVisualization/DiagLoopZ.m": {
+    "mtime": 1785591996.6494107,
+    "ast_hash": "5eee4872dbd124ff88b59c59e9326d4b",
+    "semantic_hash": ""
+  },
+  "MATLAB_PointCloudVisualization/DiagYaw.m": {
+    "mtime": 1785657499.4831848,
+    "ast_hash": "f0f59f9858d6e64bf97ea82b61c28c0a",
+    "semantic_hash": ""
+  },
+  "MATLAB_PointCloudVisualization/LoopClosureAttempt_Piano1.m": {
+    "mtime": 1785659467.0177624,
+    "ast_hash": "c2893d275c10ba08bd1c87db75f369fe",
+    "semantic_hash": ""
+  },
+  "MATLAB_PointCloudVisualization/Matlab_try1.m": {
+    "mtime": 1785576648.0673833,
+    "ast_hash": "c67aed6e2e554c2abbe6a80adad23e3b",
+    "semantic_hash": ""
+  },
+  "MATLAB_PointCloudVisualization/Piano1_CorridoioLungo.m": {
+    "mtime": 1785845836.0449321,
+    "ast_hash": "2e7b95b7ecdbbb13a58871417c69c77f",
+    "semantic_hash": ""
+  },
+  "MATLAB_PointCloudVisualization/PlayCloudBuild.m": {
+    "mtime": 1785663629.4503193,
+    "ast_hash": "b2af0ee0c133bb1e0423e0c917dab94e",
+    "semantic_hash": ""
+  },
+  "MATLAB_PointCloudVisualization/TestGravityFix.m": {
+    "mtime": 1785593215.100504,
+    "ast_hash": "8570937bb7ecf4903e61edf1f5c58bee",
+    "semantic_hash": ""
+  },
+  "MATLAB_PointCloudVisualization/TestGravityFix2.m": {
+    "mtime": 1785593295.6736455,
+    "ast_hash": "45041372efe83582d24f9b23f72da2af",
+    "semantic_hash": ""
+  },
+  "MATLAB_PointCloudVisualization/TestGravityFix3.m": {
+    "mtime": 1785594024.515107,
+    "ast_hash": "97d42e06d35f4ca0477edead25a357ca",
+    "semantic_hash": ""
+  },
+  "MATLAB_PointCloudVisualization/TestYawFix.m": {
+    "mtime": 1785657980.4751077,
+    "ast_hash": "1058e0fd384b2b4bd1033eb35f90857f",
+    "semantic_hash": ""
+  },
+  "MATLAB_PointCloudVisualization/TuneLoopWeights.m": {
+    "mtime": 1785591692.3968334,
+    "ast_hash": "9686f8dbdae0a5a7bef419c136d0ac88",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/data/readme_example.json": {
+    "mtime": 1784018227.0064075,
+    "ast_hash": "eed31edfc090185318036249fce16925",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/data/surfaces_axis_merge.json": {
+    "mtime": 1784018084.2353792,
+    "ast_hash": "c4508bf2e055cddfb8a2007b67bf928e",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/data/surfaces_legacy_xyz.json": {
+    "mtime": 1784018095.795581,
+    "ast_hash": "9595dbd197601b034f3dfb1e1070903a",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/data/surfaces_merged.json": {
+    "mtime": 1784017513.7047453,
+    "ast_hash": "f209f7411ee7be05ed204f4675cfb4ef",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/data/surfaces_merged_50.json": {
+    "mtime": 1784018008.102826,
+    "ast_hash": "bc3bbcb11164f6ecac5e1b8f9ed64baf",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/data/surfaces_merged_bbox.json": {
+    "mtime": 1784017523.6309118,
+    "ast_hash": "b9354cf60561a1a474e5bb873ed174af",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/data/surfaces_merged_gated.json": {
+    "mtime": 1784017988.5672495,
+    "ast_hash": "89cfbce93522f87a49232acba3e38e27",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/data/surfaces_warn.json": {
+    "mtime": 1784017535.2807946,
+    "ast_hash": "18293b292ca4cee8b1513d78ff9d2411",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/data/wall.json": {
+    "mtime": 1783855118.9693503,
+    "ast_hash": "58b3a8e81fa18b3f5f2684b517d96be0",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/data/wall_qc.json": {
+    "mtime": 1783855118.978583,
+    "ast_hash": "d329bf66715658aa7dc4a00793de1f7e",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/extract_sample.py": {
+    "mtime": 1783786100.9037957,
+    "ast_hash": "a5c6979fd259c5b4a9d910798c4c0cb5",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/main.py": {
+    "mtime": 1784817130.6007588,
+    "ast_hash": "7fa5680238766c0eb0c92c05fff1e5db",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/octree/__init__.py": {
+    "mtime": 1784101097.3670137,
+    "ast_hash": "630d66c4a8357fc5b77e663a0ddb898b",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/octree/classes.py": {
+    "mtime": 1783951385.793643,
+    "ast_hash": "19593f8b2a9925c8c5034b72ff17f481",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/octree/las_loader.py": {
+    "mtime": 1783936771.499769,
+    "ast_hash": "7d09c11bf5d1a4476ca95f0b97de7e7f",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/octree/octree.py": {
+    "mtime": 1783786035.3660405,
+    "ast_hash": "56d0449a3177bc462c1c01abd42fc2f3",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/octree/openstudio_adapter.py": {
+    "mtime": 1783793263.5047574,
+    "ast_hash": "7398ec305207529599b68a6d8263409f",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/octree/rosbag_loader.py": {
+    "mtime": 1784294543.7252426,
+    "ast_hash": "2735a5b746c3801f62baa3f0e110a821",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/octree/smoothing.py": {
+    "mtime": 1784017807.7201815,
+    "ast_hash": "9e362c89621bc88a5bef5ffc754aa766",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/octree/viewer.py": {
+    "mtime": 1784101600.8813162,
+    "ast_hash": "6c0a64bf46c983b5e9b3cc5669c36d92",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/octree/voxelizer.py": {
+    "mtime": 1784101891.1730814,
+    "ast_hash": "979997685803d31bba0117a07aadba70",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/target_hole_analysis.py": {
+    "mtime": 1784897988.707295,
+    "ast_hash": "dc05d721f0fd29916fa0bd271eb397fd",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/PointCloudView/view_pcd.py": {
+    "mtime": 1785333569.4589076,
+    "ast_hash": "8ec9aa6e983aec74a323ba385d443011",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/PointCloudView/view_pointcloud.py": {
+    "mtime": 1784987019.515818,
+    "ast_hash": "894d38dd5798be13a7f870389180b419",
+    "semantic_hash": ""
+  },
+  "RadiometricCalibration/ThermalData.py": {
+    "mtime": 1784213051.303581,
+    "ast_hash": "fb27ca752464bb79ea8764313ef7de69",
+    "semantic_hash": ""
+  },
+  "RadiometricCalibration/main.py": {
+    "mtime": 1783762006.644626,
+    "ast_hash": "a5b033958c87156d78e38210801d87b3",
+    "semantic_hash": ""
+  },
+  "RadiometricCalibration/make_demo_data.py": {
+    "mtime": 1783762016.05383,
+    "ast_hash": "b0c8d5e33c7dc7a5a123d6cb629d7478",
+    "semantic_hash": ""
+  },
+  "RadiometricCalibration/radiometric/__init__.py": {
+    "mtime": 1783761981.0808039,
+    "ast_hash": "298760c612c6158bdc6c5cbdaad05dbc",
+    "semantic_hash": ""
+  },
+  "RadiometricCalibration/radiometric/atmosphere.py": {
+    "mtime": 1783761920.8638644,
+    "ast_hash": "3143dba2db8feab67df9f0d43ae0a166",
+    "semantic_hash": ""
+  },
+  "RadiometricCalibration/radiometric/correction.py": {
+    "mtime": 1783761956.9444494,
+    "ast_hash": "f730066c6d0f0750ce5f5c36e946dda4",
+    "semantic_hash": ""
+  },
+  "RadiometricCalibration/radiometric/io_maps.py": {
+    "mtime": 1783761974.1374533,
+    "ast_hash": "6c0a0056bb3a4e9f4780628424613504",
+    "semantic_hash": ""
+  },
+  "RadiometricCalibration/radiometric/radiance.py": {
+    "mtime": 1783761956.9202638,
+    "ast_hash": "a6677e4bf2c1e6553f6d8fd6ae606973",
+    "semantic_hash": ""
+  },
+  "RadiometricCalibration/radiometric/sensors.py": {
+    "mtime": 1783761979.8043518,
+    "ast_hash": "1fafa16578f475f9bde61d263b082a17",
+    "semantic_hash": ""
+  },
+  "SensorFusion/convert_livox_bag.py": {
+    "mtime": 1785268384.5978243,
+    "ast_hash": "af4f0611d3c0249eab51172f7bfc390e",
+    "semantic_hash": ""
+  },
+  "SensorFusion/dump_pose_ranges.py": {
+    "mtime": 1785686860.8892994,
+    "ast_hash": "01e683c2a56483e0480932a236dfabc8",
+    "semantic_hash": ""
+  },
+  "SensorFusion/find_board_limits.py": {
+    "mtime": 1785752732.137715,
+    "ast_hash": "6361c483b1f61893f1210df78dfa8ebc",
+    "semantic_hash": ""
+  },
+  "SensorFusion/recompute_pose_windows.py": {
+    "mtime": 1785685944.9974732,
+    "ast_hash": "0daabca6315c7e393807b3b8871fbad3",
+    "semantic_hash": ""
+  },
+  "SensorFusion/resync_pose_metadata.py": {
+    "mtime": 1785786431.79255,
+    "ast_hash": "857a8fba6c988b23f012e4dda32fc33f",
+    "semantic_hash": ""
+  },
+  "SensorFusion/split_flir_poses.py": {
+    "mtime": 1785684542.7344108,
+    "ast_hash": "2aa21a25be36accc7377d7afd324ee84",
+    "semantic_hash": ""
+  },
+  "SensorFusion/split_zed_poses.py": {
+    "mtime": 1785786180.037994,
+    "ast_hash": "5a771b6ffcc34f84aae356e56c3ab40a",
+    "semantic_hash": ""
+  },
+  "SensorFusion/sync_manifest.py": {
+    "mtime": 1785075570.559277,
+    "ast_hash": "62c67ddae4cee1198dd033b28136e008",
+    "semantic_hash": ""
+  },
+  "SensorFusion/zed_record.py": {
+    "mtime": 1785251791.796693,
+    "ast_hash": "f9665bcbbc09fa7c3dd1251f6887e47d",
+    "semantic_hash": ""
+  },
+  "venvsoctree/Scripts/Activate.ps1": {
+    "mtime": 1783785924.1594317,
+    "ast_hash": "9d50094d38980162543fb0677c4939c3",
+    "semantic_hash": ""
+  },
+  "Calibration/FlirAltriFiles/thermal_intrinsic.yaml": {
+    "mtime": 1785181803.2526622,
+    "ast_hash": "7af340e45e9b201f8243d2ca0f0ca7d3",
+    "semantic_hash": ""
+  },
+  "Calibration/README.md": {
+    "mtime": 1785662267.7564516,
+    "ast_hash": "4c8260eed203efbbf7ceafb23806d7bb",
+    "semantic_hash": ""
+  },
+  "Calibration/requirements.txt": {
+    "mtime": 1785662240.1145842,
+    "ast_hash": "dc84b1ebfc1d712f41f7591de4a7d158",
+    "semantic_hash": ""
+  },
+  "Calibration/thermal_intrinsic.yaml": {
+    "mtime": 1785182356.490269,
+    "ast_hash": "ccf5f3c0a45a8fb309c6d0a9822d84fa",
+    "semantic_hash": ""
+  },
+  "Calibration/zed_right_intrinsic.yaml": {
+    "mtime": 1784971519.6892726,
+    "ast_hash": "34ad3a9a7988d3e117e7387a677f636f",
+    "semantic_hash": ""
+  },
+  "CameraServer/README.md": {
+    "mtime": 1784722501.7256095,
+    "ast_hash": "eb7756bdcc6fcf9d38d55957ec5eae94",
+    "semantic_hash": ""
+  },
+  "CameraServer/run_commands.txt": {
+    "mtime": 1784722514.7179773,
+    "ast_hash": "f2cf6053d721e9ab529615023000a783",
+    "semantic_hash": ""
+  },
+  "DriveView/README.md": {
+    "mtime": 1784722618.7661912,
+    "ast_hash": "1051e0777a5a086ed8e7dbb74a5de209",
+    "semantic_hash": ""
+  },
+  "EmissivityCalculation/README.md": {
+    "mtime": 1784722688.822752,
+    "ast_hash": "d39bdac7f312193b7442c078a6b5f3c7",
+    "semantic_hash": ""
+  },
+  "EmissivityCalculation/requirements.txt": {
+    "mtime": 1783603103.151875,
+    "ast_hash": "1eb2a8ae0b2ae80043dfc169cda14ed3",
+    "semantic_hash": ""
+  },
+  "EmissivityCalculation/run_commands.txt": {
+    "mtime": 1784712625.8527453,
+    "ast_hash": "ba9e972634afcbfbee7aa16598a97019",
+    "semantic_hash": ""
+  },
+  "LVTCalibUpdate/config/lidar_pattern_param.yaml": {
+    "mtime": 1785353613.9699893,
+    "ast_hash": "ce82f49dd26e6872185c936e596cb324",
+    "semantic_hash": ""
+  },
+  "LVTCalibUpdate/flir_frame_publisher/CMakeLists.txt": {
+    "mtime": 1785353614.1857972,
+    "ast_hash": "ee1e13dde397eaafb6256e5cfe4220ab",
+    "semantic_hash": ""
+  },
+  "LVTCalibUpdate/flir_frame_publisher/README.md": {
+    "mtime": 1785353614.1797614,
+    "ast_hash": "2625cf66162a8114eab0ef4ddea477c1",
+    "semantic_hash": ""
+  },
+  "LVTCalibUpdate/zed_frame_publisher/CMakeLists.txt": {
+    "mtime": 1785353614.0562525,
+    "ast_hash": "14ede4e2ae69aea98009bfea5144fff1",
+    "semantic_hash": ""
+  },
+  "LVTCalibUpdate/zed_frame_publisher/README.md": {
+    "mtime": 1785353614.062824,
+    "ast_hash": "fe4f010efd853181df7fb52e8e3347b5",
+    "semantic_hash": ""
+  },
+  "LidarDistance/README.md": {
+    "mtime": 1784187887.2714481,
+    "ast_hash": "a10df7aa1d18f43cf279f549686c111c",
+    "semantic_hash": ""
+  },
+  "LidarDistance/run_commands.txt": {
+    "mtime": 1784187868.2473693,
+    "ast_hash": "1b4aec5f22c87f56c9a2479b250c6492",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/README.md": {
+    "mtime": 1784108885.1921947,
+    "ast_hash": "03bc9194c4d27bed2bd96798cfdd5ccf",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/requirements.txt": {
+    "mtime": 1784101118.3412092,
+    "ast_hash": "1d6e0ea7d1fba514e1a8dbb77a9bea61",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/PointCloudView/README.md": {
+    "mtime": 1784987309.4219408,
+    "ast_hash": "68b24f1e618f1cd053e27f3b93995199",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1784722441.5384617,
+    "ast_hash": "4e76b1fc856cdf7676106b4f068ab0a5",
+    "semantic_hash": ""
+  },
+  "RadiometricCalibration/README.md": {
+    "mtime": 1783870753.6913278,
+    "ast_hash": "6f872e9808de81397cb30e016b6a0439",
+    "semantic_hash": ""
+  },
+  "RadiometricCalibration/requirements.txt": {
+    "mtime": 1784211810.0681493,
+    "ast_hash": "30f1bf73b8691e95d7279083e8ebec56",
+    "semantic_hash": ""
+  },
+  "SensorFusion/README.md": {
+    "mtime": 1785075634.0185661,
+    "ast_hash": "c80e6b68157755ed389587fb6e0977eb",
+    "semantic_hash": ""
+  },
+  "SensorFusion/requirements.txt": {
+    "mtime": 1785075640.2452636,
+    "ast_hash": "720fc121a28ba358e4888d2f33c40b48",
+    "semantic_hash": ""
+  },
+  "ubuntu_run_commands.txt": {
+    "mtime": 1784283837.5839384,
+    "ast_hash": "d71ece544ed0da15e36781c48e394af0",
+    "semantic_hash": ""
+  },
+  "EmissivityCalculation/test_images/brick.jpg": {
+    "mtime": 1783603188.3886828,
+    "ast_hash": "97b5fd941e466b62776e1339b3bde367",
+    "semantic_hash": ""
+  },
+  "EmissivityCalculation/test_images/wood.jpg": {
+    "mtime": 1783603231.5575905,
+    "ast_hash": "a933fb39cfb7b38930be048113adc918",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/data/after_fix_u.png": {
+    "mtime": 1784016044.9411988,
+    "ast_hash": "359619137a5158d34c9bda03b6c99425",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/data/check_010.png": {
+    "mtime": 1784016161.506937,
+    "ast_hash": "dac9790152bbbf02ef2dee8478629287",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/data/flat_axis_check.png": {
+    "mtime": 1784016156.8071325,
+    "ast_hash": "104a85e88ca6c2e31d96f325c7a95d8e",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/data/merged_view.png": {
+    "mtime": 1784017546.6851661,
+    "ast_hash": "fc83b9d2aa82df47641830e237600a3d",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/data/merged_view_50.png": {
+    "mtime": 1784018047.5033858,
+    "ast_hash": "d43218f9ad57fcf8da81face732e4911",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/data/plane_raster.png": {
+    "mtime": 1783855148.9863138,
+    "ast_hash": "bfefb9f91d93efdbc677240c3da0f3c6",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/data/wall_raster.png": {
+    "mtime": 1783855120.635741,
+    "ast_hash": "bfefb9f91d93efdbc677240c3da0f3c6",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/nul.png": {
+    "mtime": 1783856503.540083,
+    "ast_hash": "43e67440066d88a3eac6e7ef608dea34",
+    "semantic_hash": ""
+  },
+  "PointCloudElaboration/OcTree/~nul.png": {
+    "mtime": 1783856503.54,
+    "ast_hash": "43e67440066d88a3eac6e7ef608dea34",
+    "semantic_hash": ""
+  }
+}
