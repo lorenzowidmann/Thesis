@@ -115,8 +115,8 @@
     "semantic_hash": ""
   },
   "EmissivityCalculation/emissivity/table.py": {
-    "mtime": 1786350707.3561752,
-    "ast_hash": "627c9c4a9713911eb42668329cd6eab5",
+    "mtime": 1783603045.6242478,
+    "ast_hash": "27afe79f56a5799858111aed3109e4e5",
     "semantic_hash": ""
   },
   "EmissivityCalculation/main.py": {
@@ -215,8 +215,8 @@
     "semantic_hash": ""
   },
   "MATLAB_PointCloudVisualization/LoopClosureAttempt_Piano1.m": {
-    "mtime": 1786477250.5845988,
-    "ast_hash": "852ceb351aebd3f60ef77fcd77ceaddb",
+    "mtime": 1785659467.0177624,
+    "ast_hash": "c2893d275c10ba08bd1c87db75f369fe",
     "semantic_hash": ""
   },
   "MATLAB_PointCloudVisualization/Matlab_try1.m": {
@@ -225,8 +225,8 @@
     "semantic_hash": ""
   },
   "MATLAB_PointCloudVisualization/Piano1_CorridoioLungo.m": {
-    "mtime": 1786523455.0529935,
-    "ast_hash": "9249048ed80b3bcf598ec7b72d37364d",
+    "mtime": 1786191398.1813817,
+    "ast_hash": "4fef24ccd39dfa3111bea41b7e4c671a",
     "semantic_hash": ""
   },
   "MATLAB_PointCloudVisualization/PlayCloudBuild.m": {
@@ -580,8 +580,8 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1786624339.1401596,
-    "ast_hash": "c559f9b01bdb3bcc44e04462ff9b7241",
+    "mtime": 1784722441.5384617,
+    "ast_hash": "4e76b1fc856cdf7676106b4f068ab0a5",
     "semantic_hash": ""
   },
   "RadiometricCalibration/README.md": {
@@ -675,8 +675,8 @@
     "semantic_hash": ""
   },
   "EmissivityCalculation/classify_session.py": {
-    "mtime": 1786350717.6875033,
-    "ast_hash": "dd429f2dd04ac3baff24adf6979125f6",
+    "mtime": 1786117010.7668047,
+    "ast_hash": "cc488e468c2985e800dbb77dd643b486",
     "semantic_hash": ""
   },
   "EmissivityCalculation/emissivity/segmentation.py": {
@@ -700,13 +700,13 @@
     "semantic_hash": ""
   },
   "EmissivityCalculation/emissivity/zones.py": {
-    "mtime": 1786561800.1071315,
-    "ast_hash": "14f8ad2553c7b9268c0abfec99cae497",
+    "mtime": 1786116602.6198215,
+    "ast_hash": "045c266b372a108268e5f7990e01960b",
     "semantic_hash": ""
   },
   "EmissivityCalculation/voxel_consensus.py": {
-    "mtime": 1786350741.388431,
-    "ast_hash": "d2b75ec0eb3fee5d3b1086fec458b416",
+    "mtime": 1786121962.187561,
+    "ast_hash": "8b43864556451955cf48a54eb8fd893c",
     "semantic_hash": ""
   },
   "MATLAB_IntrinsicCalibration/FlirZedViewer_Session9.m": {
@@ -730,8 +730,8 @@
     "semantic_hash": ""
   },
   "MATLAB_TemperatureCorrectionVisualisation/ShowMaterialConsensus.m": {
-    "mtime": 1786540003.7971091,
-    "ast_hash": "2325058753bbea4fcfe3a415bbcbb712",
+    "mtime": 1786122691.3298254,
+    "ast_hash": "8478ec047ff0d96b79ce290ca9ed1829",
     "semantic_hash": ""
   },
   "MATLAB_TemperatureCorrectionVisualisation/ShowTemperatureCorrection.m": {
@@ -755,8 +755,8 @@
     "semantic_hash": ""
   },
   "OpenStudioModel/show_planes.py": {
-    "mtime": 1786368037.0825956,
-    "ast_hash": "b6df5bba779b520c00508b852d67d445",
+    "mtime": 1786297048.993073,
+    "ast_hash": "1272c4bce932f679314392e0d8c97aed",
     "semantic_hash": ""
   },
   "RadiometricCalibration/correct_session.py": {
@@ -765,8 +765,8 @@
     "semantic_hash": ""
   },
   "OpenStudioModel/requirements.txt": {
-    "mtime": 1786365827.608556,
-    "ast_hash": "ed8b744a6e00f0a503a8eb3cdcf6e296",
+    "mtime": 1786297048.9920578,
+    "ast_hash": "93493b271f7b63ae71095eba62ad5687",
     "semantic_hash": ""
   },
   "MATLAB_IntrinsicCalibration/output/flir_on_zed_session9_pose09.png": {
@@ -832,76 +832,6 @@
   "OpenStudioModel/Images/thesis_planes_with_cloud.png": {
     "mtime": 1786297048.9896457,
     "ast_hash": "346b790f3d153a78bb3f80545fec5bb5",
-    "semantic_hash": ""
-  },
-  "EmissivityCalculation/add_surface_hsi.py": {
-    "mtime": 1786605706.739123,
-    "ast_hash": "e7cf547daa3b63747f39fd982afae7cd",
-    "semantic_hash": ""
-  },
-  "EmissivityCalculation/make_synthetic_thermal_voxels.py": {
-    "mtime": 1786458957.7411058,
-    "ast_hash": "ffeb6248bdb3eda5e1317f1cc72e4f61",
-    "semantic_hash": ""
-  },
-  "EmissivityCalculation/view_u_voxels.py": {
-    "mtime": 1786348280.246574,
-    "ast_hash": "e6f048f04730bfe70687ed370133cd8e",
-    "semantic_hash": ""
-  },
-  "EmissivityCalculation/voxel_solar_ns.py": {
-    "mtime": 1786551353.8949945,
-    "ast_hash": "7cd06cb045c0593ec26734978e1ba5f8",
-    "semantic_hash": ""
-  },
-  "EmissivityCalculation/voxel_u_value.py": {
-    "mtime": 1786605758.1285262,
-    "ast_hash": "fbdad0ef4cbfbd91d9a025d4d30fc3e0",
-    "semantic_hash": ""
-  },
-  "MATLAB_PointCloudVisualization/Piano1_CorridoioCorto.m": {
-    "mtime": 1786399339.031984,
-    "ast_hash": "b1ef3a6e588fd764e10b944a1e39982c",
-    "semantic_hash": ""
-  },
-  "MATLAB_TemperatureCorrectionVisualisation/ShowVoxelMaterial3D.m": {
-    "mtime": 1786609788.9582946,
-    "ast_hash": "6adaf2493ada6f4ae3790e0c7ceb2bc1",
-    "semantic_hash": ""
-  },
-  "OpenStudioModel/fit_window_polygons.py": {
-    "mtime": 1786610344.6427283,
-    "ast_hash": "38d3ab01cfff7176edfdb0b2dbc438ac",
-    "semantic_hash": ""
-  },
-  "OpenStudioModel/parse_arpav.py": {
-    "mtime": 1786369490.2327647,
-    "ast_hash": "1abd6d9ab8a96d824586689552dec0fe",
-    "semantic_hash": ""
-  },
-  "OpenStudioModel/planes_session6.json": {
-    "mtime": 1786385222.5530498,
-    "ast_hash": "58dff1eb99b09359b24a9c52b4580b02",
-    "semantic_hash": ""
-  },
-  "OpenStudioModel/sun_incidence.py": {
-    "mtime": 1786369701.5789933,
-    "ast_hash": "760b1ff8ae2990571efcc65762821bda",
-    "semantic_hash": ""
-  },
-  "OpenStudioModel/to_openstudio.py": {
-    "mtime": 1786606741.5027792,
-    "ast_hash": "91da3ea4a95a0313b50ab54af5652b17",
-    "semantic_hash": ""
-  },
-  "OpenStudioModel/north_check_193.png": {
-    "mtime": 1786368976.598338,
-    "ast_hash": "31a2afa893bed2c26bcdc774c06ccec1",
-    "semantic_hash": ""
-  },
-  "OpenStudioModel/plane3_day_real_ghi.png": {
-    "mtime": 1786369711.1963055,
-    "ast_hash": "65f0176be8a7ebc849da8f7f6b79767f",
     "semantic_hash": ""
   }
 }

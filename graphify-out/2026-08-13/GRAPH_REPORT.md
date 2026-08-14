@@ -1,16 +1,16 @@
-# Graph Report - Thesis  (2026-08-13)
+# Graph Report - Thesis  (2026-08-09)
 
 ## Corpus Check
-- 138 files · ~534,733 words
+- 126 files · ~509,678 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1072 nodes · 1765 edges · 76 communities (69 shown, 7 thin omitted)
+- 1031 nodes · 1724 edges · 60 communities (58 shown, 2 thin omitted)
 - Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 90 edges (avg confidence: 0.75)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `43c659ce`
+- Built from commit: `8d51df86`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -70,22 +70,6 @@
 - merge_planar_surface
 - camera_server.py
 - ffprobe_frame_count
-- segmentation.py
-- projection.py
-- project_to_flir.py
-- rig_calibration.py
-- ImageSource
-- MaterialClassifier
-- voxel_solar_ns.py
-- fit_window_polygons.py
-- sun_incidence.py
-- to_openstudio.py
-- _rotate_surface_back
-- add_surface_hsi.py
-- make_synthetic_thermal_voxels.py
-- view_u_voxels.py
-- voxel_u_value.py
-- parse_arpav.py
 
 ## God Nodes (most connected - your core abstractions)
 1. `VoxelGrid` - 25 edges
@@ -100,21 +84,21 @@
 10. `render_screenshot()` - 13 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `main()` --calls--> `project_lidar_to_camera()`  [INFERRED]
-  EmissivityCalculation/project_to_flir.py → Calibration/projection.py
-- `project_points()` --calls--> `project_lidar_to_camera()`  [INFERRED]
-  EmissivityCalculation/voxel_consensus.py → Calibration/projection.py
 - `main()` --calls--> `flir_fov_bbox_in_zed()`  [INFERRED]
   EmissivityCalculation/classify_session.py → Calibration/projection.py
 - `main()` --calls--> `load_rig_calibration()`  [INFERRED]
   EmissivityCalculation/classify_session.py → Calibration/rig_calibration.py
-- `main()` --calls--> `load_rig_calibration()`  [INFERRED]
-  EmissivityCalculation/project_to_flir.py → Calibration/rig_calibration.py
+- `main()` --calls--> `WebcamSource`  [INFERRED]
+  CameraServer/camera_server.py → EmissivityCalculation/emissivity/sources.py
+- `main()` --calls--> `SharedZedSource`  [INFERRED]
+  DriveView/drive_view.py → CameraServer/shared_frame.py
+- `main()` --calls--> `SharedZedSource`  [INFERRED]
+  EmissivityCalculation/main.py → CameraServer/shared_frame.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (76 total, 7 thin omitted)
+## Communities (60 total, 2 thin omitted)
 
 ### Community 0 - "detect_board_poses.py"
 Cohesion: 0.06
@@ -141,32 +125,32 @@ Cohesion: 0.10
 Nodes (31): _apply_clahe(), calibrate(), CalibrationResult, checkerboard_object_points(), detect_all(), detect_corners(), find_images(), main() (+23 more)
 
 ### Community 6 - "viewer.py"
-Cohesion: 0.09
-Nodes (35): class_name(), _color_lut(), colorize(), ndarray, TUM-FACADE semantic classes: id -> name and id -> RGB color.  Class ids and name, (MAX_CLASS_ID+1, 3) float array mapping class id -> RGB., Map an (N,) array of class ids to an (N,3) float RGB array., _add_points() (+27 more)
+Cohesion: 0.11
+Nodes (28): class_name(), _color_lut(), colorize(), ndarray, TUM-FACADE semantic classes: id -> name and id -> RGB color.  Class ids and name, (MAX_CLASS_ID+1, 3) float array mapping class id -> RGB., Map an (N,) array of class ids to an (N,3) float RGB array., _add_points() (+20 more)
 
 ### Community 7 - "diagnose_flir_calib.py"
 Cohesion: 0.13
 Nodes (31): _aggregate(), Fit, fit_model(), _fit_subset(), _fmt_dist(), FoldStats, _initial_guess(), main() (+23 more)
 
 ### Community 8 - "SharedZedSource"
-Cohesion: 0.09
-Nodes (20): _load_module(), main(), parse_args(), Namespace, Path, _cleanup_stale(), FrameReader, FrameWriter (+12 more)
+Cohesion: 0.12
+Nodes (13): _cleanup_stale(), FrameReader, FrameWriter, _now_ms(), ndarray, Seqlock-protected shared-memory frame buffer: one writer, many readers.  Windows, Return the latest published frame, retrying on a torn read., Drop-in replacement for ZedUvcSource when another process (camera_server     .py (+5 more)
 
 ### Community 9 - "zed_intrinsic_calib.py"
 Cohesion: 0.12
 Nodes (25): calibrate(), CalibrationResult, checkerboard_object_points(), detect_all(), detect_corners(), find_images(), main(), parse_args() (+17 more)
 
 ### Community 10 - "_merge_adjacent_rectangles"
-Cohesion: 0.10
-Nodes (24): _merge_adjacent_rectangles(), One rectangle in the merge pass: integer raster-cell bounds, inclusive., Whether `a`/`b` share a full or partial edge, within `gap_tolerance` cells., Merge touching (or near-touching) same-class rectangles into unified ones., _Rect, _rects_touch(), _UnionFind, cluster_labels() (+16 more)
+Cohesion: 0.16
+Nodes (17): cluster_labels(), declutter(), main(), Open and view a point cloud from a rosbag with PyVista.  Usage:     python view_, Remove disconnected islands far from the main body.      - keep_dist > 0: keep t, Keep one point per voxel of edge `size` (metres)., Return the centre of every occupied voxel of edge `size` (metres)., Build one cube mesh of edge `size` at each voxel centre. (+9 more)
 
 ### Community 11 - "sync_manifest.py"
 Cohesion: 0.12
 Nodes (27): build_triplets(), compute_offset(), flir_timestamp(), list_flir_frames(), load_lidar_poses(), load_zed_frames(), main(), nearest_index() (+19 more)
 
 ### Community 12 - "__init__.py"
-Cohesion: 0.26
-Nodes (11): Provenance for one output rectangle, parallel to a SubSurface's `polygons`., RectMergeInfo, cube_origin(), ndarray, Edge length of the cubic bounding box of the cloud., Lower corner of the centered cubic bounding box (matches the octree root)., Voxel edge of a complete octree at `depth`: root_extent / 2**depth., Voxels of a complete octree at `depth` (centered cube lattice).      Equivalen (+3 more)
+Cohesion: 0.17
+Nodes (20): main(), Provenance for one output rectangle, parallel to a SubSurface's `polygons`., RectMergeInfo, cube_origin(), filter_by_count(), _grid_from_index(), ndarray, Fast voxel sampling of a point cloud (numpy).  Each point is mapped to an inte (+12 more)
 
 ### Community 13 - "target_hole_analysis.py"
 Cohesion: 0.14
@@ -177,8 +161,8 @@ Cohesion: 0.10
 Nodes (20): 1. Capture the board, 2. Solve the intrinsics, 3. Hand off to LVT2Calib, Bag rate check — `check_bag_rate.py`, Calibration, Correspondence, Detection, Getting the board numbers right (+12 more)
 
 ### Community 15 - "sources.py"
-Cohesion: 0.18
-Nodes (8): ABC, FrameSource, _open_capture(), Frame sources: still image, webcam, and ZED 2i stereo camera.  All sources retur, ZED 2i single-eye RGB frames via plain UVC (OpenCV), no ZED SDK/GPU needed., cv2.VideoCapture(int) enumerates devices per-backend, and on Linux the     V4L2/, WebcamSource, ZedUvcSource
+Cohesion: 0.12
+Nodes (12): ABC, FrameSource, ImageSource, _open_capture(), ndarray, Path, Frame sources: still image, webcam, and ZED 2i stereo camera.  All sources retur, ZED 2i single-eye RGB frames via plain UVC (OpenCV), no ZED SDK/GPU needed. (+4 more)
 
 ### Community 16 - "check_bag_rate.py"
 Cohesion: 0.18
@@ -190,11 +174,11 @@ Nodes (17): classify_frame(), classify_grid(), crop_roi(), default_center_roi(),
 
 ### Community 18 - "octree.py"
 Cohesion: 0.18
-Nodes (17): main(), parse_args(), print_info(), OcTree — sample a TUM-FACADE point cloud into voxels and visualize it.  Loads, Occupied octree leaves at depth d == voxelizer voxels at the matching size., selftest(), build_octree(), _cube_root() (+9 more)
+Nodes (16): parse_args(), print_info(), OcTree — sample a TUM-FACADE point cloud into voxels and visualize it.  Loads, Occupied octree leaves at depth d == voxelizer voxels at the matching size., selftest(), build_octree(), _cube_root(), leaf_voxels() (+8 more)
 
 ### Community 19 - "__init__.py"
-Cohesion: 0.16
-Nodes (16): apply_low_emissivity_gate(), draw_overlay(), load_zed_frames_dir(), main(), parse_args(), ndarray, Path, Material + emissivity per region, for every frame of a recorded ZED session (dr (+8 more)
+Cohesion: 0.06
+Nodes (40): apply_low_emissivity_gate(), draw_overlay(), load_zed_frames_dir(), main(), parse_args(), ndarray, Path, Material + emissivity per region, for every frame of a recorded ZED session (dr (+32 more)
 
 ### Community 20 - "export_livox_cloud.py"
 Cohesion: 0.24
@@ -217,8 +201,8 @@ Cohesion: 0.21
 Nodes (13): hole_centers(), main(), Path, Genera i template PCD per LVT2Calib con la geometria della board reale.  Board:, Scrive un PCD ASCII con campi x y z intensity range (5 campi),     stesso schema, I 4 centri, ai vertici di un quadrato di lato 2*offset., Punti lungo il perimetro del rettangolo, passo `spacing`., Punti lungo la circonferenza, passo `spacing` misurato sull'arco. (+5 more)
 
 ### Community 25 - "smooth_surface"
-Cohesion: 0.21
-Nodes (10): PlaneAnchor, principal_yaw(), A previously computed RANSAC plane, reusable to keep a surface put.      Pass th, Capture the plane a RANSAC-fitted surface was built on, or None (legacy fit / no, Flatten `grid` onto a single plane, preserving class zoning.      offset_method:, Dominant horizontal direction of the voxels, in degrees (0-180).      PCA on the, Rotate `grid`'s centers by -yaw_deg about their horizontal centroid.      Keeps, _rotate_grid_horizontal() (+2 more)
+Cohesion: 0.14
+Nodes (13): PlaneAnchor, principal_yaw(), A previously computed RANSAC plane, reusable to keep a surface put.      Pass th, Capture the plane a RANSAC-fitted surface was built on, or None (legacy fit / no, Flatten `grid` onto a single plane, preserving class zoning.      offset_method:, Dominant horizontal direction of the voxels, in degrees (0-180).      PCA on the, Rotate `grid`'s centers by -yaw_deg about their horizontal centroid.      Keeps, Inverse of _rotate_grid_horizontal's rotation, for (..., 2) xy arrays. (+5 more)
 
 ### Community 26 - "ThermalData.py"
 Cohesion: 0.25
@@ -233,8 +217,8 @@ Cohesion: 0.23
 Nodes (10): _load_surface(), Path, Map a PlanarSurface (or its JSON) to an OpenStudio .osm model.  Thin adapter ove, Write an OpenStudio .osm from a PlanarSurface or its exported JSON., to_osm(), PlanarSurface, Path, Write the planar surface as OpenStudio-friendly JSON (polygons + roles).      Sc (+2 more)
 
 ### Community 29 - "ZedSource"
-Cohesion: 0.25
-Nodes (14): frames_with(), load_emissivity(), load_solar_absorptance(), main(), parse_args(), project_points(), Path, Multi-view material consensus, and a 3-D thermal map, by voxel voting.  Why - (+6 more)
+Cohesion: 0.08
+Nodes (40): flir_fov_bbox_in_zed(), project_lidar_to_camera(), ndarray, quat_to_rotation_matrix(), Project LiDAR points into a camera's pixel space.  Generic: works for either F, xyzw quaternion (ROS convention, as stored in sync_manifest.json's     triplet[, Undo the SLAM pose (lidar-local -> world) to bring world points back     into t, Project world-frame LiDAR points into one camera's pixel space.      Returns: (+32 more)
 
 ### Community 30 - "PointCloudView"
 Cohesion: 0.18
@@ -305,8 +289,8 @@ Cohesion: 0.60
 Nodes (4): file_seconds(), hhmmss(), main(), Estrae HHMMSS dal nome file e lo converte in secondi. None se non combacia.
 
 ### Community 48 - ".classify"
-Cohesion: 0.10
-Nodes (32): canonical_normal_offset(), close_geometry(), cluster_labels(), crop_roi(), declutter(), dedupe_planes(), fit_oriented_rect(), largest_cluster_mask() (+24 more)
+Cohesion: 0.07
+Nodes (39): canonical_normal_offset(), close_geometry(), cluster_labels(), crop_roi(), declutter(), dedupe_planes(), fit_oriented_rect(), largest_cluster_mask() (+31 more)
 
 ### Community 49 - "extract_sample.py"
 Cohesion: 0.67
@@ -321,71 +305,25 @@ Cohesion: 0.22
 Nodes (8): ClassMergeStats, merge_planar_surface(), MergeSummary, _quad(), Planar quad (4,3) for in-plane cell-corner spans [u0,u1] x [v0,v1] (world axes)., Per-class diagnostic counts from one merge_planar_surface() call., Diagnostics for one merge_planar_surface() call, one entry per class., Merge touching same-class rectangles across an already-smoothed surface.      Po
 
 ### Community 58 - "camera_server.py"
-Cohesion: 0.20
-Nodes (7): _is_cached(), Zero-shot material classification with CLIP.  Uses openai/clip-vit-base-patch32, Best-effort check for a local snapshot, just to print an honest message     -- f, EmissivityRecord, EmissivityTable, Path, Tabulated emissivity and solar-absorptance values loaded from a CSV file.  The C
+Cohesion: 0.29
+Nodes (7): _load_module(), main(), parse_args(), Namespace, Path, find_v4l2_capture_index(), Linux: return the integer index N of the /dev/videoN node that     advertises th
 
 ### Community 59 - "ffprobe_frame_count"
 Cohesion: 0.60
 Nodes (5): extract_frames(), ffprobe_frame_count(), main(), Path, Exact decoded frame count (ffprobe -count_frames), not the container's     (some
 
-### Community 60 - "segmentation.py"
-Cohesion: 0.23
-Nodes (12): _fill_gaps(), ndarray, Segmentation into zones for material classification: the "smallest possible zon, Per-segment id, bounding box (x0,y0,x1,y1), centroid, and area, in the     same, RGB HxWx3 uint8 image -> int label raster (HxW), one id per superpixel.      s, SAM's transform: longest side to `size`, normalise, pad to square.     Done her, Give every pixel inside `valid` a label, by nearest labelled neighbour.     SAM, RGB HxWx3 uint8 image -> int label raster (HxW), one id per SAM mask.      A ` (+4 more)
-
-### Community 61 - "projection.py"
-Cohesion: 0.25
-Nodes (10): flir_fov_bbox_in_zed(), project_lidar_to_camera(), ndarray, quat_to_rotation_matrix(), Project LiDAR points into a camera's pixel space.  Generic: works for either F, xyzw quaternion (ROS convention, as stored in sync_manifest.json's     triplet[, Undo the SLAM pose (lidar-local -> world) to bring world points back     into t, Project world-frame LiDAR points into one camera's pixel space.      Returns: (+2 more)
-
-### Community 62 - "project_to_flir.py"
-Cohesion: 0.31
-Nodes (10): main(), nearest_clouds_for_targets(), nearest_fill(), parse_args(), ndarray, Path, Fuse ZED-classified material/emissivity (classify_session.py) onto real FLIR pix, One pass over the bag; for each target epoch, return the (timestamp,     points) (+2 more)
-
-### Community 63 - "rig_calibration.py"
-Cohesion: 0.27
-Nodes (8): _camera_intrinsics(), CameraIntrinsics, load_rig_calibration(), ndarray, Path, Load the canonical rig calibration (rig_calibration.yaml): FLIR/ZED intrinsics a, ZED K rescaled from its calibration resolution to an actual         capture size, RigCalibration
-
-### Community 64 - "ImageSource"
-Cohesion: 0.20
-Nodes (4): ImageSource, ndarray, Path, Return the next frame as an RGB HxWx3 uint8 array.
-
-### Community 65 - "MaterialClassifier"
-Cohesion: 0.39
-Nodes (5): MaterialClassifier, ndarray, Same as classify(), but encodes every image in one batched forward         pass, Classify the material in the image.          Args:             image: RGB image, Image
-
-### Community 66 - "voxel_solar_ns.py"
-Cohesion: 0.38
-Nodes (6): main(), outward_normal(), Solar correction for the NORTH and SOUTH corridor walls, per voxel, via the SOL-, (unit normal, d) re-oriented to point away from `interior`., Call sun_incidence.py for one plane at one instant, return its row.      Asks fo, run_sun_incidence()
-
-### Community 67 - "fit_window_polygons.py"
-Cohesion: 0.43
-Nodes (6): find_plane(), main(), outward_normal(), plane_axes(), Fit rectangular window polygons on a wall, from real + inferred glass voxels, fo, Thickness axis (most aligned with the normal) and the two in-plane     axes. Cor
-
-### Community 68 - "sun_incidence.py"
-Cohesion: 0.60
-Nodes (4): local_bearing_deg(), main(), Sun position + corrected incidence irradiance on a vertical glazed surface, usin, wall_planes()
-
-### Community 69 - "to_openstudio.py"
-Cohesion: 0.50
-Nodes (4): fix_winding(), main(), Build an OpenStudio model (.osm) from fit_planes.py's planes.json.  Standalone g, Reverse the vertex order if the polygon's implied normal (from its own     point
-
-### Community 70 - "_rotate_surface_back"
-Cohesion: 0.50
-Nodes (4): Inverse of _rotate_grid_horizontal's rotation, for (..., 2) xy arrays., Rotate a surface's polygons and deviations' xy back into world coords, in place., _rotate_surface_back(), _rotate_xy_back()
-
 ## Knowledge Gaps
 - **82 isolated node(s):** `Setup`, `Options`, `Shooting a good set`, `Options`, `Getting the board numbers right` (+77 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **7 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `EmissivityTable` connect `camera_server.py` to `main`, `MaterialClassifier`, `__init__.py`, `main.py`?**
-  _High betweenness centrality (0.023) - this node is a cross-community bridge._
-- **Why does `main()` connect `main` to `camera_server.py`?**
-  _High betweenness centrality (0.021) - this node is a cross-community bridge._
-- **Why does `cluster_labels()` connect `.classify` to `_merge_adjacent_rectangles`?**
-  _High betweenness centrality (0.016) - this node is a cross-community bridge._
+- **Why does `EmissivityTable` connect `__init__.py` to `main.py`, `main`?**
+  _High betweenness centrality (0.028) - this node is a cross-community bridge._
+- **Why does `main()` connect `main` to `__init__.py`?**
+  _High betweenness centrality (0.022) - this node is a cross-community bridge._
 - **Are the 9 inferred relationships involving `VoxelGrid` (e.g. with `ClassMergeStats` and `MergeSummary`) actually correct?**
   _`VoxelGrid` has 9 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `Setup`, `Options`, `Shooting a good set` to the rest of the system?**
@@ -394,3 +332,5 @@ _Questions this graph is uniquely positioned to answer:_
   _Cohesion score 0.059506531204644414 - nodes in this community are weakly interconnected._
 - **Should `__init__.py` be split into smaller, more focused modules?**
   _Cohesion score 0.0641025641025641 - nodes in this community are weakly interconnected._
+- **Should `smoothing.py` be split into smaller, more focused modules?**
+  _Cohesion score 0.10104529616724739 - nodes in this community are weakly interconnected._

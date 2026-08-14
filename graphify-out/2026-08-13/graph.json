@@ -1860,7 +1860,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "calibration_projection",
-      "community": 61,
+      "community": 29,
       "norm_label": "projection.py"
     },
     {
@@ -1870,7 +1870,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "calibration_projection_quat_to_rotation_matrix",
-      "community": 61,
+      "community": 29,
       "norm_label": "quat_to_rotation_matrix()"
     },
     {
@@ -1880,7 +1880,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "calibration_projection_py_ndarray",
-      "community": 61,
+      "community": 29,
       "norm_label": "ndarray"
     },
     {
@@ -1890,7 +1890,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "calibration_projection_world_to_lidar_local",
-      "community": 61,
+      "community": 29,
       "norm_label": "world_to_lidar_local()"
     },
     {
@@ -1900,7 +1900,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "calibration_projection_project_lidar_to_camera",
-      "community": 61,
+      "community": 29,
       "norm_label": "project_lidar_to_camera()"
     },
     {
@@ -1910,7 +1910,7 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "calibration_projection_flir_fov_bbox_in_zed",
-      "community": 61,
+      "community": 29,
       "norm_label": "flir_fov_bbox_in_zed()"
     },
     {
@@ -1920,7 +1920,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "calibration_projection_rationale_1",
-      "community": 61,
+      "community": 29,
       "norm_label": "project lidar points into a camera's pixel space.  generic: works for either f"
     },
     {
@@ -1930,7 +1930,7 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "calibration_projection_rationale_20",
-      "community": 61,
+      "community": 29,
       "norm_label": "xyzw quaternion (ros convention, as stored in sync_manifest.json's     triplet["
     },
     {
@@ -1940,7 +1940,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "calibration_projection_rationale_38",
-      "community": 61,
+      "community": 29,
       "norm_label": "undo the slam pose (lidar-local -> world) to bring world points back     into t"
     },
     {
@@ -1950,7 +1950,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "calibration_projection_rationale_54",
-      "community": 61,
+      "community": 29,
       "norm_label": "project world-frame lidar points into one camera's pixel space.      returns:"
     },
     {
@@ -1960,7 +1960,7 @@
       "source_location": "L89",
       "_origin": "ast",
       "id": "calibration_projection_rationale_89",
-      "community": 61,
+      "community": 29,
       "norm_label": "bounding box, in zed pixels, of everything the flir can see.      there is no"
     },
     {
@@ -1970,7 +1970,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "calibration_rig_calibration",
-      "community": 63,
+      "community": 29,
       "norm_label": "rig_calibration.py"
     },
     {
@@ -1980,7 +1980,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "calibration_rig_calibration_cameraintrinsics",
-      "community": 63,
+      "community": 29,
       "norm_label": "cameraintrinsics"
     },
     {
@@ -1990,7 +1990,7 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "calibration_rig_calibration_rigcalibration",
-      "community": 63,
+      "community": 29,
       "norm_label": "rigcalibration"
     },
     {
@@ -2000,7 +2000,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "calibration_rig_calibration_rigcalibration_zed_k_for",
-      "community": 63,
+      "community": 29,
       "norm_label": ".zed_k_for()"
     },
     {
@@ -2010,7 +2010,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "calibration_rig_calibration_py_ndarray",
-      "community": 63,
+      "community": 29,
       "norm_label": "ndarray"
     },
     {
@@ -2020,7 +2020,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "calibration_rig_calibration_camera_intrinsics",
-      "community": 63,
+      "community": 29,
       "norm_label": "_camera_intrinsics()"
     },
     {
@@ -2030,7 +2030,7 @@
       "source_location": "L61",
       "_origin": "ast",
       "id": "calibration_rig_calibration_load_rig_calibration",
-      "community": 63,
+      "community": 29,
       "norm_label": "load_rig_calibration()"
     },
     {
@@ -2040,7 +2040,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "calibration_rig_calibration_py_path",
-      "community": 63,
+      "community": 29,
       "norm_label": "path"
     },
     {
@@ -2050,7 +2050,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "calibration_rig_calibration_rationale_1",
-      "community": 63,
+      "community": 29,
       "norm_label": "load the canonical rig calibration (rig_calibration.yaml): flir/zed intrinsics a"
     },
     {
@@ -2060,7 +2060,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "calibration_rig_calibration_rationale_35",
-      "community": 63,
+      "community": 29,
       "norm_label": "zed k rescaled from its calibration resolution to an actual         capture size"
     },
     {
@@ -2370,7 +2370,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "cameraserver_camera_server",
-      "community": 8,
+      "community": 58,
       "norm_label": "camera_server.py"
     },
     {
@@ -2380,7 +2380,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "cameraserver_camera_server_load_module",
-      "community": 8,
+      "community": 58,
       "norm_label": "_load_module()"
     },
     {
@@ -2390,7 +2390,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "cameraserver_camera_server_py_path",
-      "community": 8,
+      "community": 58,
       "norm_label": "path"
     },
     {
@@ -2400,7 +2400,7 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "cameraserver_camera_server_parse_args",
-      "community": 8,
+      "community": 58,
       "norm_label": "parse_args()"
     },
     {
@@ -2410,7 +2410,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "cameraserver_camera_server_py_namespace",
-      "community": 8,
+      "community": 58,
       "norm_label": "namespace"
     },
     {
@@ -2420,7 +2420,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "cameraserver_camera_server_main",
-      "community": 8,
+      "community": 58,
       "norm_label": "main()"
     },
     {
@@ -2744,36 +2744,6 @@
       "norm_label": "main()"
     },
     {
-      "label": "add_surface_hsi.py",
-      "file_type": "code",
-      "source_file": "EmissivityCalculation/add_surface_hsi.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "emissivitycalculation_add_surface_hsi",
-      "community": 71,
-      "norm_label": "add_surface_hsi.py"
-    },
-    {
-      "label": "main()",
-      "file_type": "code",
-      "source_file": "EmissivityCalculation/add_surface_hsi.py",
-      "source_location": "L38",
-      "_origin": "ast",
-      "id": "emissivitycalculation_add_surface_hsi_main",
-      "community": 71,
-      "norm_label": "main()"
-    },
-    {
-      "label": "Add surface_type + hsi_used columns to a thermal_voxels.csv (voxel_consensus.py",
-      "file_type": "rationale",
-      "source_file": "EmissivityCalculation/add_surface_hsi.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "emissivitycalculation_add_surface_hsi_rationale_1",
-      "community": 71,
-      "norm_label": "add surface_type + hsi_used columns to a thermal_voxels.csv (voxel_consensus.py"
-    },
-    {
       "label": "classify_session.py",
       "file_type": "code",
       "source_file": "EmissivityCalculation/classify_session.py",
@@ -2900,7 +2870,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_init",
-      "community": 58,
+      "community": 19,
       "norm_label": "__init__.py"
     },
     {
@@ -2910,7 +2880,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_classifier",
-      "community": 58,
+      "community": 19,
       "norm_label": "classifier.py"
     },
     {
@@ -2920,7 +2890,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_classifier_is_cached",
-      "community": 58,
+      "community": 19,
       "norm_label": "_is_cached()"
     },
     {
@@ -2930,7 +2900,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_classifier_materialclassifier",
-      "community": 65,
+      "community": 19,
       "norm_label": "materialclassifier"
     },
     {
@@ -2940,7 +2910,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_classifier_materialclassifier_init",
-      "community": 58,
+      "community": 19,
       "norm_label": ".__init__()"
     },
     {
@@ -2950,7 +2920,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_classifier_materialclassifier_image_inputs",
-      "community": 65,
+      "community": 19,
       "norm_label": "._image_inputs()"
     },
     {
@@ -2960,7 +2930,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_classifier_materialclassifier_classify",
-      "community": 65,
+      "community": 19,
       "norm_label": ".classify()"
     },
     {
@@ -2970,7 +2940,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_classifier_py_ndarray",
-      "community": 65,
+      "community": 19,
       "norm_label": "ndarray"
     },
     {
@@ -2980,7 +2950,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "image",
-      "community": 65,
+      "community": 19,
       "norm_label": "image"
     },
     {
@@ -2990,7 +2960,7 @@
       "source_location": "L110",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_classifier_materialclassifier_classify_batch",
-      "community": 65,
+      "community": 19,
       "norm_label": ".classify_batch()"
     },
     {
@@ -3000,7 +2970,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_classifier_rationale_1",
-      "community": 58,
+      "community": 19,
       "norm_label": "zero-shot material classification with clip.  uses openai/clip-vit-base-patch32"
     },
     {
@@ -3010,7 +2980,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_classifier_rationale_17",
-      "community": 58,
+      "community": 19,
       "norm_label": "best-effort check for a local snapshot, just to print an honest message     -- f"
     },
     {
@@ -3020,7 +2990,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_classifier_rationale_83",
-      "community": 65,
+      "community": 19,
       "norm_label": "classify the material in the image.          args:             image: rgb image"
     },
     {
@@ -3030,7 +3000,7 @@
       "source_location": "L113",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_classifier_rationale_113",
-      "community": 65,
+      "community": 19,
       "norm_label": "same as classify(), but encodes every image in one batched forward         pass"
     },
     {
@@ -3040,7 +3010,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_segmentation",
-      "community": 60,
+      "community": 19,
       "norm_label": "segmentation.py"
     },
     {
@@ -3050,7 +3020,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_segmentation_superpixel_segments",
-      "community": 60,
+      "community": 19,
       "norm_label": "superpixel_segments()"
     },
     {
@@ -3060,7 +3030,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_segmentation_py_ndarray",
-      "community": 60,
+      "community": 19,
       "norm_label": "ndarray"
     },
     {
@@ -3070,7 +3040,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_segmentation_sam_preprocess",
-      "community": 60,
+      "community": 19,
       "norm_label": "_sam_preprocess()"
     },
     {
@@ -3080,7 +3050,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_segmentation_fill_gaps",
-      "community": 60,
+      "community": 19,
       "norm_label": "_fill_gaps()"
     },
     {
@@ -3090,7 +3060,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_segmentation_sam_segments",
-      "community": 60,
+      "community": 19,
       "norm_label": "sam_segments()"
     },
     {
@@ -3100,7 +3070,7 @@
       "source_location": "L135",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_segmentation_segment_boxes",
-      "community": 60,
+      "community": 19,
       "norm_label": "segment_boxes()"
     },
     {
@@ -3110,7 +3080,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_segmentation_rationale_1",
-      "community": 60,
+      "community": 19,
       "norm_label": "segmentation into zones for material classification: the \"smallest possible zon"
     },
     {
@@ -3120,7 +3090,7 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_segmentation_rationale_34",
-      "community": 60,
+      "community": 19,
       "norm_label": "rgb hxwx3 uint8 image -> int label raster (hxw), one id per superpixel.      s"
     },
     {
@@ -3130,7 +3100,7 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_segmentation_rationale_46",
-      "community": 60,
+      "community": 19,
       "norm_label": "sam's transform: longest side to `size`, normalise, pad to square.     done her"
     },
     {
@@ -3140,7 +3110,7 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_segmentation_rationale_60",
-      "community": 60,
+      "community": 19,
       "norm_label": "give every pixel inside `valid` a label, by nearest labelled neighbour.     sam"
     },
     {
@@ -3150,7 +3120,7 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_segmentation_rationale_77",
-      "community": 60,
+      "community": 19,
       "norm_label": "rgb hxwx3 uint8 image -> int label raster (hxw), one id per sam mask.      a `"
     },
     {
@@ -3160,7 +3130,7 @@
       "source_location": "L136",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_segmentation_rationale_136",
-      "community": 60,
+      "community": 19,
       "norm_label": "per-segment id, bounding box (x0,y0,x1,y1), centroid, and area, in the     same"
     },
     {
@@ -3180,7 +3150,7 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_sources_find_v4l2_capture_index",
-      "community": 8,
+      "community": 58,
       "norm_label": "find_v4l2_capture_index()"
     },
     {
@@ -3220,7 +3190,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_sources_framesource_grab",
-      "community": 64,
+      "community": 15,
       "norm_label": ".grab()"
     },
     {
@@ -3230,7 +3200,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_sources_py_ndarray",
-      "community": 64,
+      "community": 15,
       "norm_label": "ndarray"
     },
     {
@@ -3270,7 +3240,7 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_sources_imagesource",
-      "community": 64,
+      "community": 15,
       "norm_label": "imagesource"
     },
     {
@@ -3280,7 +3250,7 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_sources_imagesource_init",
-      "community": 64,
+      "community": 15,
       "norm_label": ".__init__()"
     },
     {
@@ -3290,7 +3260,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_sources_py_path",
-      "community": 64,
+      "community": 15,
       "norm_label": "path"
     },
     {
@@ -3300,7 +3270,7 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_sources_imagesource_grab",
-      "community": 64,
+      "community": 15,
       "norm_label": ".grab()"
     },
     {
@@ -3330,7 +3300,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_sources_webcamsource_grab",
-      "community": 64,
+      "community": 15,
       "norm_label": ".grab()"
     },
     {
@@ -3370,7 +3340,7 @@
       "source_location": "L154",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_sources_zeduvcsource_grab",
-      "community": 64,
+      "community": 15,
       "norm_label": ".grab()"
     },
     {
@@ -3410,7 +3380,7 @@
       "source_location": "L190",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_sources_zedsource_grab",
-      "community": 64,
+      "community": 56,
       "norm_label": ".grab()"
     },
     {
@@ -3440,7 +3410,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_sources_rationale_17",
-      "community": 8,
+      "community": 58,
       "norm_label": "linux: return the integer index n of the /dev/videon node that     advertises th"
     },
     {
@@ -3460,7 +3430,7 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_sources_rationale_88",
-      "community": 64,
+      "community": 15,
       "norm_label": "return the next frame as an rgb hxwx3 uint8 array."
     },
     {
@@ -3490,37 +3460,37 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_table",
-      "community": 58,
+      "community": 19,
       "norm_label": "table.py"
     },
     {
       "label": "EmissivityRecord",
       "file_type": "code",
       "source_file": "EmissivityCalculation/emissivity/table.py",
-      "source_location": "L26",
+      "source_location": "L17",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_table_emissivityrecord",
-      "community": 58,
+      "community": 19,
       "norm_label": "emissivityrecord"
     },
     {
       "label": "EmissivityTable",
       "file_type": "code",
       "source_file": "EmissivityCalculation/emissivity/table.py",
-      "source_location": "L36",
+      "source_location": "L25",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_table_emissivitytable",
-      "community": 58,
+      "community": 19,
       "norm_label": "emissivitytable"
     },
     {
       "label": ".__init__()",
       "file_type": "code",
       "source_file": "EmissivityCalculation/emissivity/table.py",
-      "source_location": "L37",
+      "source_location": "L26",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_table_emissivitytable_init",
-      "community": 58,
+      "community": 19,
       "norm_label": ".__init__()"
     },
     {
@@ -3530,48 +3500,48 @@
       "source_location": "",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_table_py_path",
-      "community": 58,
+      "community": 19,
       "norm_label": "path"
     },
     {
       "label": ".materials()",
       "file_type": "code",
       "source_file": "EmissivityCalculation/emissivity/table.py",
-      "source_location": "L58",
+      "source_location": "L44",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_table_emissivitytable_materials",
-      "community": 58,
+      "community": 19,
       "norm_label": ".materials()"
     },
     {
       "label": ".prompts()",
       "file_type": "code",
       "source_file": "EmissivityCalculation/emissivity/table.py",
-      "source_location": "L62",
+      "source_location": "L48",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_table_emissivitytable_prompts",
-      "community": 58,
+      "community": 19,
       "norm_label": ".prompts()"
     },
     {
       "label": ".lookup()",
       "file_type": "code",
       "source_file": "EmissivityCalculation/emissivity/table.py",
-      "source_location": "L65",
+      "source_location": "L51",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_table_emissivitytable_lookup",
-      "community": 58,
+      "community": 19,
       "norm_label": ".lookup()"
     },
     {
-      "label": "Tabulated emissivity and solar-absorptance values loaded from a CSV file.  The C",
+      "label": "Tabulated emissivity values loaded from a CSV file.  The CSV columns are: materi",
       "file_type": "rationale",
       "source_file": "EmissivityCalculation/emissivity/table.py",
       "source_location": "L1",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_table_rationale_1",
-      "community": 58,
-      "norm_label": "tabulated emissivity and solar-absorptance values loaded from a csv file.  the c"
+      "community": 19,
+      "norm_label": "tabulated emissivity values loaded from a csv file.  the csv columns are: materi"
     },
     {
       "label": "zones.py",
@@ -3597,7 +3567,7 @@
       "label": "restrict_ranking()",
       "file_type": "code",
       "source_file": "EmissivityCalculation/emissivity/zones.py",
-      "source_location": "L79",
+      "source_location": "L69",
       "_origin": "ast",
       "id": "emissivitycalculation_emissivity_zones_restrict_ranking",
       "community": 19,
@@ -3627,9 +3597,9 @@
       "label": "Drop candidates the zone forbids, renormalising the remaining scores.      `ra",
       "file_type": "rationale",
       "source_file": "EmissivityCalculation/emissivity/zones.py",
-      "source_location": "L80",
+      "source_location": "L70",
       "_origin": "ast",
-      "id": "emissivitycalculation_emissivity_zones_rationale_80",
+      "id": "emissivitycalculation_emissivity_zones_rationale_70",
       "community": 19,
       "norm_label": "drop candidates the zone forbids, renormalising the remaining scores.      `ra"
     },
@@ -3814,43 +3784,13 @@
       "norm_label": "classify every cell of a rows x cols grid tiling `frame` (or the     sub-region"
     },
     {
-      "label": "make_synthetic_thermal_voxels.py",
-      "file_type": "code",
-      "source_file": "EmissivityCalculation/make_synthetic_thermal_voxels.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "emissivitycalculation_make_synthetic_thermal_voxels",
-      "community": 72,
-      "norm_label": "make_synthetic_thermal_voxels.py"
-    },
-    {
-      "label": "main()",
-      "file_type": "code",
-      "source_file": "EmissivityCalculation/make_synthetic_thermal_voxels.py",
-      "source_location": "L41",
-      "_origin": "ast",
-      "id": "emissivitycalculation_make_synthetic_thermal_voxels_main",
-      "community": 72,
-      "norm_label": "main()"
-    },
-    {
-      "label": "SYNTHETIC pipeline-validation data -- NOT measured, do not treat as real.  Takes",
-      "file_type": "rationale",
-      "source_file": "EmissivityCalculation/make_synthetic_thermal_voxels.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "emissivitycalculation_make_synthetic_thermal_voxels_rationale_1",
-      "community": 72,
-      "norm_label": "synthetic pipeline-validation data -- not measured, do not treat as real.  takes"
-    },
-    {
       "label": "project_to_flir.py",
       "file_type": "code",
       "source_file": "EmissivityCalculation/project_to_flir.py",
       "source_location": "L1",
       "_origin": "ast",
       "id": "emissivitycalculation_project_to_flir",
-      "community": 62,
+      "community": 29,
       "norm_label": "project_to_flir.py"
     },
     {
@@ -3860,7 +3800,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "emissivitycalculation_project_to_flir_read_pointcloud2",
-      "community": 62,
+      "community": 29,
       "norm_label": "read_pointcloud2()"
     },
     {
@@ -3870,7 +3810,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "emissivitycalculation_project_to_flir_py_ndarray",
-      "community": 62,
+      "community": 29,
       "norm_label": "ndarray"
     },
     {
@@ -3880,7 +3820,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "emissivitycalculation_project_to_flir_nearest_clouds_for_targets",
-      "community": 62,
+      "community": 29,
       "norm_label": "nearest_clouds_for_targets()"
     },
     {
@@ -3890,7 +3830,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "emissivitycalculation_project_to_flir_py_path",
-      "community": 62,
+      "community": 29,
       "norm_label": "path"
     },
     {
@@ -3900,7 +3840,7 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "emissivitycalculation_project_to_flir_nearest_fill",
-      "community": 62,
+      "community": 29,
       "norm_label": "nearest_fill()"
     },
     {
@@ -3910,7 +3850,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "emissivitycalculation_project_to_flir_parse_args",
-      "community": 62,
+      "community": 29,
       "norm_label": "parse_args()"
     },
     {
@@ -3920,7 +3860,7 @@
       "source_location": "L135",
       "_origin": "ast",
       "id": "emissivitycalculation_project_to_flir_main",
-      "community": 62,
+      "community": 29,
       "norm_label": "main()"
     },
     {
@@ -3930,7 +3870,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "emissivitycalculation_project_to_flir_rationale_1",
-      "community": 62,
+      "community": 29,
       "norm_label": "fuse zed-classified material/emissivity (classify_session.py) onto real flir pix"
     },
     {
@@ -3940,7 +3880,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "emissivitycalculation_project_to_flir_rationale_54",
-      "community": 62,
+      "community": 29,
       "norm_label": "one pass over the bag; for each target epoch, return the (timestamp,     points)"
     },
     {
@@ -3950,38 +3890,8 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "emissivitycalculation_project_to_flir_rationale_93",
-      "community": 62,
+      "community": 29,
       "norm_label": "brute-force nearest-neighbor fill: every unsampled pixel gets the     value of t"
-    },
-    {
-      "label": "view_u_voxels.py",
-      "file_type": "code",
-      "source_file": "EmissivityCalculation/view_u_voxels.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "emissivitycalculation_view_u_voxels",
-      "community": 73,
-      "norm_label": "view_u_voxels.py"
-    },
-    {
-      "label": "main()",
-      "file_type": "code",
-      "source_file": "EmissivityCalculation/view_u_voxels.py",
-      "source_location": "L24",
-      "_origin": "ast",
-      "id": "emissivitycalculation_view_u_voxels_main",
-      "community": 73,
-      "norm_label": "main()"
-    },
-    {
-      "label": "Interactive PyVista viewer for voxel_u_value.py's output CSV, with flag_reason-b",
-      "file_type": "rationale",
-      "source_file": "EmissivityCalculation/view_u_voxels.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "emissivitycalculation_view_u_voxels_rationale_1",
-      "community": 73,
-      "norm_label": "interactive pyvista viewer for voxel_u_value.py's output csv, with flag_reason-b"
     },
     {
       "label": "voxel_consensus.py",
@@ -4004,20 +3914,10 @@
       "norm_label": "load_emissivity()"
     },
     {
-      "label": "load_solar_absorptance()",
-      "file_type": "code",
-      "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L76",
-      "_origin": "ast",
-      "id": "emissivitycalculation_voxel_consensus_load_solar_absorptance",
-      "community": 29,
-      "norm_label": "load_solar_absorptance()"
-    },
-    {
       "label": "parse_args()",
       "file_type": "code",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L85",
+      "source_location": "L76",
       "_origin": "ast",
       "id": "emissivitycalculation_voxel_consensus_parse_args",
       "community": 29,
@@ -4027,7 +3927,7 @@
       "label": "frames_with()",
       "file_type": "code",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L133",
+      "source_location": "L124",
       "_origin": "ast",
       "id": "emissivitycalculation_voxel_consensus_frames_with",
       "community": 29,
@@ -4047,7 +3947,7 @@
       "label": "project_points()",
       "file_type": "code",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L143",
+      "source_location": "L134",
       "_origin": "ast",
       "id": "emissivitycalculation_voxel_consensus_project_points",
       "community": 29,
@@ -4057,7 +3957,7 @@
       "label": "stage_vote()",
       "file_type": "code",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L153",
+      "source_location": "L144",
       "_origin": "ast",
       "id": "emissivitycalculation_voxel_consensus_stage_vote",
       "community": 29,
@@ -4067,7 +3967,7 @@
       "label": "stage_thermal()",
       "file_type": "code",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L307",
+      "source_location": "L298",
       "_origin": "ast",
       "id": "emissivitycalculation_voxel_consensus_stage_thermal",
       "community": 29,
@@ -4077,7 +3977,7 @@
       "label": "main()",
       "file_type": "code",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L427",
+      "source_location": "L411",
       "_origin": "ast",
       "id": "emissivitycalculation_voxel_consensus_main",
       "community": 29,
@@ -4104,22 +4004,12 @@
       "norm_label": "material -> emissivity. read with stdlib csv on purpose: emissivity.table     p"
     },
     {
-      "label": "material -> solar_absorptance. Same stdlib-csv rationale as load_emissivity.",
-      "file_type": "rationale",
-      "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L77",
-      "_origin": "ast",
-      "id": "emissivitycalculation_voxel_consensus_rationale_77",
-      "community": 29,
-      "norm_label": "material -> solar_absorptance. same stdlib-csv rationale as load_emissivity."
-    },
-    {
       "label": "Triplets whose per-frame folder under `needed` exists.",
       "file_type": "rationale",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L134",
+      "source_location": "L125",
       "_origin": "ast",
-      "id": "emissivitycalculation_voxel_consensus_rationale_134",
+      "id": "emissivitycalculation_voxel_consensus_rationale_125",
       "community": 29,
       "norm_label": "triplets whose per-frame folder under `needed` exists."
     },
@@ -4127,111 +4017,11 @@
       "label": "LiDAR points -> pixels in the ZED or FLIR frame.",
       "file_type": "rationale",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L144",
+      "source_location": "L135",
       "_origin": "ast",
-      "id": "emissivitycalculation_voxel_consensus_rationale_144",
+      "id": "emissivitycalculation_voxel_consensus_rationale_135",
       "community": 29,
       "norm_label": "lidar points -> pixels in the zed or flir frame."
-    },
-    {
-      "label": "voxel_solar_ns.py",
-      "file_type": "code",
-      "source_file": "EmissivityCalculation/voxel_solar_ns.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "emissivitycalculation_voxel_solar_ns",
-      "community": 66,
-      "norm_label": "voxel_solar_ns.py"
-    },
-    {
-      "label": "outward_normal()",
-      "file_type": "code",
-      "source_file": "EmissivityCalculation/voxel_solar_ns.py",
-      "source_location": "L145",
-      "_origin": "ast",
-      "id": "emissivitycalculation_voxel_solar_ns_outward_normal",
-      "community": 66,
-      "norm_label": "outward_normal()"
-    },
-    {
-      "label": "run_sun_incidence()",
-      "file_type": "code",
-      "source_file": "EmissivityCalculation/voxel_solar_ns.py",
-      "source_location": "L157",
-      "_origin": "ast",
-      "id": "emissivitycalculation_voxel_solar_ns_run_sun_incidence",
-      "community": 66,
-      "norm_label": "run_sun_incidence()"
-    },
-    {
-      "label": "main()",
-      "file_type": "code",
-      "source_file": "EmissivityCalculation/voxel_solar_ns.py",
-      "source_location": "L190",
-      "_origin": "ast",
-      "id": "emissivitycalculation_voxel_solar_ns_main",
-      "community": 66,
-      "norm_label": "main()"
-    },
-    {
-      "label": "Solar correction for the NORTH and SOUTH corridor walls, per voxel, via the SOL-",
-      "file_type": "rationale",
-      "source_file": "EmissivityCalculation/voxel_solar_ns.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "emissivitycalculation_voxel_solar_ns_rationale_1",
-      "community": 66,
-      "norm_label": "solar correction for the north and south corridor walls, per voxel, via the sol-"
-    },
-    {
-      "label": "(unit normal, d) re-oriented to point away from `interior`.",
-      "file_type": "rationale",
-      "source_file": "EmissivityCalculation/voxel_solar_ns.py",
-      "source_location": "L146",
-      "_origin": "ast",
-      "id": "emissivitycalculation_voxel_solar_ns_rationale_146",
-      "community": 66,
-      "norm_label": "(unit normal, d) re-oriented to point away from `interior`."
-    },
-    {
-      "label": "Call sun_incidence.py for one plane at one instant, return its row.      Asks fo",
-      "file_type": "rationale",
-      "source_file": "EmissivityCalculation/voxel_solar_ns.py",
-      "source_location": "L158",
-      "_origin": "ast",
-      "id": "emissivitycalculation_voxel_solar_ns_rationale_158",
-      "community": 66,
-      "norm_label": "call sun_incidence.py for one plane at one instant, return its row.      asks fo"
-    },
-    {
-      "label": "voxel_u_value.py",
-      "file_type": "code",
-      "source_file": "EmissivityCalculation/voxel_u_value.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "emissivitycalculation_voxel_u_value",
-      "community": 74,
-      "norm_label": "voxel_u_value.py"
-    },
-    {
-      "label": "main()",
-      "file_type": "code",
-      "source_file": "EmissivityCalculation/voxel_u_value.py",
-      "source_location": "L94",
-      "_origin": "ast",
-      "id": "emissivitycalculation_voxel_u_value_main",
-      "community": 74,
-      "norm_label": "main()"
-    },
-    {
-      "label": "Per-voxel U-value from voxel_consensus.py's corrected-temperature voxel map.  Tw",
-      "file_type": "rationale",
-      "source_file": "EmissivityCalculation/voxel_u_value.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "emissivitycalculation_voxel_u_value_rationale_1",
-      "community": 74,
-      "norm_label": "per-voxel u-value from voxel_consensus.py's corrected-temperature voxel map.  tw"
     },
     {
       "label": "flir_frame_publisher.py",
@@ -5314,106 +5104,6 @@
       "norm_label": "reduce the plane set to a single watertight box, importable to     openstudio a"
     },
     {
-      "label": "fit_window_polygons.py",
-      "file_type": "code",
-      "source_file": "OpenStudioModel/fit_window_polygons.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "openstudiomodel_fit_window_polygons",
-      "community": 67,
-      "norm_label": "fit_window_polygons.py"
-    },
-    {
-      "label": "find_plane()",
-      "file_type": "code",
-      "source_file": "OpenStudioModel/fit_window_polygons.py",
-      "source_location": "L57",
-      "_origin": "ast",
-      "id": "openstudiomodel_fit_window_polygons_find_plane",
-      "community": 67,
-      "norm_label": "find_plane()"
-    },
-    {
-      "label": "plane_axes()",
-      "file_type": "code",
-      "source_file": "OpenStudioModel/fit_window_polygons.py",
-      "source_location": "L64",
-      "_origin": "ast",
-      "id": "openstudiomodel_fit_window_polygons_plane_axes",
-      "community": 67,
-      "norm_label": "plane_axes()"
-    },
-    {
-      "label": "outward_normal()",
-      "file_type": "code",
-      "source_file": "OpenStudioModel/fit_window_polygons.py",
-      "source_location": "L73",
-      "_origin": "ast",
-      "id": "openstudiomodel_fit_window_polygons_outward_normal",
-      "community": 67,
-      "norm_label": "outward_normal()"
-    },
-    {
-      "label": "main()",
-      "file_type": "code",
-      "source_file": "OpenStudioModel/fit_window_polygons.py",
-      "source_location": "L84",
-      "_origin": "ast",
-      "id": "openstudiomodel_fit_window_polygons_main",
-      "community": 67,
-      "norm_label": "main()"
-    },
-    {
-      "label": "Fit rectangular window polygons on a wall, from real + inferred glass voxels, fo",
-      "file_type": "rationale",
-      "source_file": "OpenStudioModel/fit_window_polygons.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "openstudiomodel_fit_window_polygons_rationale_1",
-      "community": 67,
-      "norm_label": "fit rectangular window polygons on a wall, from real + inferred glass voxels, fo"
-    },
-    {
-      "label": "Thickness axis (most aligned with the normal) and the two in-plane     axes. Cor",
-      "file_type": "rationale",
-      "source_file": "OpenStudioModel/fit_window_polygons.py",
-      "source_location": "L65",
-      "_origin": "ast",
-      "id": "openstudiomodel_fit_window_polygons_rationale_65",
-      "community": 67,
-      "norm_label": "thickness axis (most aligned with the normal) and the two in-plane     axes. cor"
-    },
-    {
-      "label": "parse_arpav.py",
-      "file_type": "code",
-      "source_file": "OpenStudioModel/parse_arpav.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "openstudiomodel_parse_arpav",
-      "community": 75,
-      "norm_label": "parse_arpav.py"
-    },
-    {
-      "label": "main()",
-      "file_type": "code",
-      "source_file": "OpenStudioModel/parse_arpav.py",
-      "source_location": "L40",
-      "_origin": "ast",
-      "id": "openstudiomodel_parse_arpav_main",
-      "community": 75,
-      "norm_label": "main()"
-    },
-    {
-      "label": "Parse an ARPAV (Veneto regional weather service) hourly station-data page (saved",
-      "file_type": "rationale",
-      "source_file": "OpenStudioModel/parse_arpav.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "openstudiomodel_parse_arpav_rationale_1",
-      "community": 75,
-      "norm_label": "parse an arpav (veneto regional weather service) hourly station-data page (saved"
-    },
-    {
       "label": "show_planes.py",
       "file_type": "code",
       "source_file": "OpenStudioModel/show_planes.py",
@@ -5462,106 +5152,6 @@
       "id": "openstudiomodel_show_planes_rationale_30",
       "community": 48,
       "norm_label": "label each point with the id of the nearest plane, if within     `threshold` me"
-    },
-    {
-      "label": "sun_incidence.py",
-      "file_type": "code",
-      "source_file": "OpenStudioModel/sun_incidence.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "openstudiomodel_sun_incidence",
-      "community": 68,
-      "norm_label": "sun_incidence.py"
-    },
-    {
-      "label": "wall_planes()",
-      "file_type": "code",
-      "source_file": "OpenStudioModel/sun_incidence.py",
-      "source_location": "L67",
-      "_origin": "ast",
-      "id": "openstudiomodel_sun_incidence_wall_planes",
-      "community": 68,
-      "norm_label": "wall_planes()"
-    },
-    {
-      "label": "local_bearing_deg()",
-      "file_type": "code",
-      "source_file": "OpenStudioModel/sun_incidence.py",
-      "source_location": "L71",
-      "_origin": "ast",
-      "id": "openstudiomodel_sun_incidence_local_bearing_deg",
-      "community": 68,
-      "norm_label": "local_bearing_deg()"
-    },
-    {
-      "label": "main()",
-      "file_type": "code",
-      "source_file": "OpenStudioModel/sun_incidence.py",
-      "source_location": "L76",
-      "_origin": "ast",
-      "id": "openstudiomodel_sun_incidence_main",
-      "community": 68,
-      "norm_label": "main()"
-    },
-    {
-      "label": "Sun position + corrected incidence irradiance on a vertical glazed surface, usin",
-      "file_type": "rationale",
-      "source_file": "OpenStudioModel/sun_incidence.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "openstudiomodel_sun_incidence_rationale_1",
-      "community": 68,
-      "norm_label": "sun position + corrected incidence irradiance on a vertical glazed surface, usin"
-    },
-    {
-      "label": "to_openstudio.py",
-      "file_type": "code",
-      "source_file": "OpenStudioModel/to_openstudio.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "openstudiomodel_to_openstudio",
-      "community": 69,
-      "norm_label": "to_openstudio.py"
-    },
-    {
-      "label": "fix_winding()",
-      "file_type": "code",
-      "source_file": "OpenStudioModel/to_openstudio.py",
-      "source_location": "L42",
-      "_origin": "ast",
-      "id": "openstudiomodel_to_openstudio_fix_winding",
-      "community": 69,
-      "norm_label": "fix_winding()"
-    },
-    {
-      "label": "main()",
-      "file_type": "code",
-      "source_file": "OpenStudioModel/to_openstudio.py",
-      "source_location": "L53",
-      "_origin": "ast",
-      "id": "openstudiomodel_to_openstudio_main",
-      "community": 69,
-      "norm_label": "main()"
-    },
-    {
-      "label": "Build an OpenStudio model (.osm) from fit_planes.py's planes.json.  Standalone g",
-      "file_type": "rationale",
-      "source_file": "OpenStudioModel/to_openstudio.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "openstudiomodel_to_openstudio_rationale_1",
-      "community": 69,
-      "norm_label": "build an openstudio model (.osm) from fit_planes.py's planes.json.  standalone g"
-    },
-    {
-      "label": "Reverse the vertex order if the polygon's implied normal (from its own     point",
-      "file_type": "rationale",
-      "source_file": "OpenStudioModel/to_openstudio.py",
-      "source_location": "L43",
-      "_origin": "ast",
-      "id": "openstudiomodel_to_openstudio_rationale_43",
-      "community": 69,
-      "norm_label": "reverse the vertex order if the polygon's implied normal (from its own     point"
     },
     {
       "label": "extract_sample.py",
@@ -5650,7 +5240,7 @@
       "source_location": "L204",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_main_main",
-      "community": 18,
+      "community": 12,
       "norm_label": "main()"
     },
     {
@@ -6520,7 +6110,7 @@
       "source_location": "L371",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_smoothing_rotate_xy_back",
-      "community": 70,
+      "community": 25,
       "norm_label": "_rotate_xy_back()"
     },
     {
@@ -6530,7 +6120,7 @@
       "source_location": "L379",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_smoothing_rotate_surface_back",
-      "community": 70,
+      "community": 25,
       "norm_label": "_rotate_surface_back()"
     },
     {
@@ -6610,7 +6200,7 @@
       "source_location": "L631",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_smoothing_rect",
-      "community": 10,
+      "community": 48,
       "norm_label": "_rect"
     },
     {
@@ -6620,7 +6210,7 @@
       "source_location": "L641",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_smoothing_rect_area",
-      "community": 10,
+      "community": 48,
       "norm_label": ".area()"
     },
     {
@@ -6640,7 +6230,7 @@
       "source_location": "L654",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_smoothing_rects_touch",
-      "community": 10,
+      "community": 48,
       "norm_label": "_rects_touch()"
     },
     {
@@ -6650,7 +6240,7 @@
       "source_location": "L680",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_smoothing_unionfind",
-      "community": 10,
+      "community": 48,
       "norm_label": "_unionfind"
     },
     {
@@ -6660,7 +6250,7 @@
       "source_location": "L681",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_smoothing_unionfind_init",
-      "community": 10,
+      "community": 48,
       "norm_label": ".__init__()"
     },
     {
@@ -6670,7 +6260,7 @@
       "source_location": "L684",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_smoothing_unionfind_find",
-      "community": 10,
+      "community": 48,
       "norm_label": ".find()"
     },
     {
@@ -6680,7 +6270,7 @@
       "source_location": "L690",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_smoothing_unionfind_union",
-      "community": 10,
+      "community": 48,
       "norm_label": ".union()"
     },
     {
@@ -6700,7 +6290,7 @@
       "source_location": "L726",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_smoothing_merge_adjacent_rectangles",
-      "community": 10,
+      "community": 48,
       "norm_label": "_merge_adjacent_rectangles()"
     },
     {
@@ -6980,7 +6570,7 @@
       "source_location": "L372",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_smoothing_rationale_372",
-      "community": 70,
+      "community": 25,
       "norm_label": "inverse of _rotate_grid_horizontal's rotation, for (..., 2) xy arrays."
     },
     {
@@ -6990,7 +6580,7 @@
       "source_location": "L380",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_smoothing_rationale_380",
-      "community": 70,
+      "community": 25,
       "norm_label": "rotate a surface's polygons and deviations' xy back into world coords, in place."
     },
     {
@@ -7070,7 +6660,7 @@
       "source_location": "L632",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_smoothing_rationale_632",
-      "community": 10,
+      "community": 48,
       "norm_label": "one rectangle in the merge pass: integer raster-cell bounds, inclusive."
     },
     {
@@ -7090,7 +6680,7 @@
       "source_location": "L655",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_smoothing_rationale_655",
-      "community": 10,
+      "community": 48,
       "norm_label": "whether `a`/`b` share a full or partial edge, within `gap_tolerance` cells."
     },
     {
@@ -7110,7 +6700,7 @@
       "source_location": "L733",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_smoothing_rationale_733",
-      "community": 10,
+      "community": 48,
       "norm_label": "merge touching (or near-touching) same-class rectangles into unified ones."
     },
     {
@@ -7450,7 +7040,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_voxelizer",
-      "community": 6,
+      "community": 12,
       "norm_label": "voxelizer.py"
     },
     {
@@ -7460,7 +7050,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_voxelizer_voxelgrid",
-      "community": 25,
+      "community": 12,
       "norm_label": "voxelgrid"
     },
     {
@@ -7470,7 +7060,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_voxelizer_voxelgrid_len",
-      "community": 25,
+      "community": 12,
       "norm_label": ".__len__()"
     },
     {
@@ -7480,7 +7070,7 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_voxelizer_grid_from_index",
-      "community": 6,
+      "community": 12,
       "norm_label": "_grid_from_index()"
     },
     {
@@ -7490,7 +7080,7 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_voxelizer_voxelize",
-      "community": 6,
+      "community": 12,
       "norm_label": "voxelize()"
     },
     {
@@ -7520,7 +7110,7 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_voxelizer_filter_by_count",
-      "community": 6,
+      "community": 12,
       "norm_label": "filter_by_count()"
     },
     {
@@ -7570,7 +7160,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_voxelizer_rationale_1",
-      "community": 6,
+      "community": 12,
       "norm_label": "fast voxel sampling of a point cloud (numpy).  each point is mapped to an inte"
     },
     {
@@ -7580,7 +7170,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_voxelizer_rationale_38",
-      "community": 6,
+      "community": 12,
       "norm_label": "collapse integer cell indices into a voxelgrid (center + majority class)."
     },
     {
@@ -7590,7 +7180,7 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_voxelizer_rationale_80",
-      "community": 6,
+      "community": 12,
       "norm_label": "sample `points` into a uniform voxel grid of edge `voxel_size`.      origin de"
     },
     {
@@ -7610,7 +7200,7 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "pointcloudelaboration_octree_octree_voxelizer_rationale_116",
-      "community": 6,
+      "community": 12,
       "norm_label": "keep only voxels with at least `min_count` points (a density filter).      dro"
     },
     {
@@ -14209,7 +13799,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L148",
+      "source_location": "L139",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus_project_points",
       "target": "calibration_projection_project_lidar_to_camera"
@@ -14421,7 +14011,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L432",
+      "source_location": "L416",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus_main",
       "target": "calibration_rig_calibration_load_rig_calibration"
@@ -15624,26 +15214,6 @@
       "target": "emissivitycalculation_emissivity_sources_zeduvcsource"
     },
     {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/add_surface_hsi.py",
-      "source_location": "L38",
-      "weight": 1.0,
-      "source": "emissivitycalculation_add_surface_hsi",
-      "target": "emissivitycalculation_add_surface_hsi_main",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/add_surface_hsi.py",
-      "source_location": "L1",
-      "weight": 1.0,
-      "source": "emissivitycalculation_add_surface_hsi_rationale_1",
-      "target": "emissivitycalculation_add_surface_hsi",
-      "confidence_score": 1.0
-    },
-    {
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
@@ -15740,7 +15310,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/classify_session.py",
-      "source_location": "L376",
+      "source_location": "L375",
       "weight": 1.0,
       "source": "emissivitycalculation_classify_session_main",
       "target": "emissivitycalculation_classify_session_utc_now_iso",
@@ -15837,7 +15407,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/classify_session.py",
-      "source_location": "L399",
+      "source_location": "L398",
       "weight": 1.0,
       "source": "emissivitycalculation_classify_session_main",
       "target": "emissivitycalculation_classify_session_draw_overlay",
@@ -17035,7 +16605,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/emissivity/table.py",
-      "source_location": "L26",
+      "source_location": "L17",
       "weight": 1.0,
       "source": "emissivitycalculation_emissivity_table",
       "target": "emissivitycalculation_emissivity_table_emissivityrecord",
@@ -17045,7 +16615,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/emissivity/table.py",
-      "source_location": "L36",
+      "source_location": "L25",
       "weight": 1.0,
       "source": "emissivitycalculation_emissivity_table",
       "target": "emissivitycalculation_emissivity_table_emissivitytable",
@@ -17066,7 +16636,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/emissivity/table.py",
-      "source_location": "L45",
+      "source_location": "L33",
       "weight": 1.0,
       "source": "emissivitycalculation_emissivity_table_emissivitytable_init",
       "target": "emissivitycalculation_emissivity_table_emissivityrecord",
@@ -17077,7 +16647,7 @@
       "context": "return_type",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/emissivity/table.py",
-      "source_location": "L65",
+      "source_location": "L51",
       "weight": 1.0,
       "source": "emissivitycalculation_emissivity_table_emissivitytable_lookup",
       "target": "emissivitycalculation_emissivity_table_emissivityrecord",
@@ -17087,7 +16657,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/emissivity/table.py",
-      "source_location": "L37",
+      "source_location": "L26",
       "weight": 1.0,
       "source": "emissivitycalculation_emissivity_table_emissivitytable",
       "target": "emissivitycalculation_emissivity_table_emissivitytable_init",
@@ -17097,7 +16667,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/emissivity/table.py",
-      "source_location": "L65",
+      "source_location": "L51",
       "weight": 1.0,
       "source": "emissivitycalculation_emissivity_table_emissivitytable",
       "target": "emissivitycalculation_emissivity_table_emissivitytable_lookup",
@@ -17107,7 +16677,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/emissivity/table.py",
-      "source_location": "L58",
+      "source_location": "L44",
       "weight": 1.0,
       "source": "emissivitycalculation_emissivity_table_emissivitytable",
       "target": "emissivitycalculation_emissivity_table_emissivitytable_materials",
@@ -17117,7 +16687,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/emissivity/table.py",
-      "source_location": "L62",
+      "source_location": "L48",
       "weight": 1.0,
       "source": "emissivitycalculation_emissivity_table_emissivitytable",
       "target": "emissivitycalculation_emissivity_table_emissivitytable_prompts",
@@ -17150,7 +16720,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/emissivity/table.py",
-      "source_location": "L37",
+      "source_location": "L26",
       "weight": 1.0,
       "source": "emissivitycalculation_emissivity_table_emissivitytable_init",
       "target": "emissivitycalculation_emissivity_table_py_path",
@@ -17160,7 +16730,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/emissivity/zones.py",
-      "source_location": "L79",
+      "source_location": "L69",
       "weight": 1.0,
       "source": "emissivitycalculation_emissivity_zones",
       "target": "emissivitycalculation_emissivity_zones_restrict_ranking",
@@ -17211,9 +16781,9 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/emissivity/zones.py",
-      "source_location": "L80",
+      "source_location": "L70",
       "weight": 1.0,
-      "source": "emissivitycalculation_emissivity_zones_rationale_80",
+      "source": "emissivitycalculation_emissivity_zones_rationale_70",
       "target": "emissivitycalculation_emissivity_zones_restrict_ranking",
       "confidence_score": 1.0
     },
@@ -17223,7 +16793,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L270",
+      "source_location": "L261",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus_stage_vote",
       "target": "emissivitycalculation_emissivity_zones_restrict_ranking"
@@ -17501,26 +17071,6 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/make_synthetic_thermal_voxels.py",
-      "source_location": "L41",
-      "weight": 1.0,
-      "source": "emissivitycalculation_make_synthetic_thermal_voxels",
-      "target": "emissivitycalculation_make_synthetic_thermal_voxels_main",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/make_synthetic_thermal_voxels.py",
-      "source_location": "L1",
-      "weight": 1.0,
-      "source": "emissivitycalculation_make_synthetic_thermal_voxels_rationale_1",
-      "target": "emissivitycalculation_make_synthetic_thermal_voxels",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/project_to_flir.py",
       "source_location": "L135",
       "weight": 1.0,
@@ -17671,7 +17221,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L322",
+      "source_location": "L312",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus_stage_thermal",
       "target": "emissivitycalculation_project_to_flir_nearest_clouds_for_targets"
@@ -17682,7 +17232,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L165",
+      "source_location": "L156",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus_stage_vote",
       "target": "emissivitycalculation_project_to_flir_nearest_clouds_for_targets"
@@ -17733,28 +17283,8 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/view_u_voxels.py",
-      "source_location": "L24",
-      "weight": 1.0,
-      "source": "emissivitycalculation_view_u_voxels",
-      "target": "emissivitycalculation_view_u_voxels_main",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/view_u_voxels.py",
-      "source_location": "L1",
-      "weight": 1.0,
-      "source": "emissivitycalculation_view_u_voxels_rationale_1",
-      "target": "emissivitycalculation_view_u_voxels",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L133",
+      "source_location": "L124",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus",
       "target": "emissivitycalculation_voxel_consensus_frames_with",
@@ -17774,17 +17304,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L76",
-      "weight": 1.0,
-      "source": "emissivitycalculation_voxel_consensus",
-      "target": "emissivitycalculation_voxel_consensus_load_solar_absorptance",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L427",
+      "source_location": "L411",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus",
       "target": "emissivitycalculation_voxel_consensus_main",
@@ -17794,7 +17314,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L85",
+      "source_location": "L76",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus",
       "target": "emissivitycalculation_voxel_consensus_parse_args",
@@ -17804,7 +17324,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L143",
+      "source_location": "L134",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus",
       "target": "emissivitycalculation_voxel_consensus_project_points",
@@ -17814,7 +17334,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L307",
+      "source_location": "L298",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus",
       "target": "emissivitycalculation_voxel_consensus_stage_thermal",
@@ -17824,7 +17344,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L153",
+      "source_location": "L144",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus",
       "target": "emissivitycalculation_voxel_consensus_stage_vote",
@@ -17855,39 +17375,18 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L156",
+      "source_location": "L147",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus_stage_vote",
       "target": "emissivitycalculation_voxel_consensus_load_emissivity",
       "confidence_score": 1.0
     },
     {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L77",
-      "weight": 1.0,
-      "source": "emissivitycalculation_voxel_consensus_rationale_77",
-      "target": "emissivitycalculation_voxel_consensus_load_solar_absorptance",
-      "confidence_score": 1.0
-    },
-    {
       "relation": "calls",
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L311",
-      "weight": 1.0,
-      "source": "emissivitycalculation_voxel_consensus_stage_thermal",
-      "target": "emissivitycalculation_voxel_consensus_load_solar_absorptance",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L428",
+      "source_location": "L412",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus_main",
       "target": "emissivitycalculation_voxel_consensus_parse_args",
@@ -17898,7 +17397,7 @@
       "context": "parameter_type",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L133",
+      "source_location": "L124",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus_frames_with",
       "target": "emissivitycalculation_voxel_consensus_py_path",
@@ -17908,9 +17407,9 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L134",
+      "source_location": "L125",
       "weight": 1.0,
-      "source": "emissivitycalculation_voxel_consensus_rationale_134",
+      "source": "emissivitycalculation_voxel_consensus_rationale_125",
       "target": "emissivitycalculation_voxel_consensus_frames_with",
       "confidence_score": 1.0
     },
@@ -17919,7 +17418,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L313",
+      "source_location": "L303",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus_stage_thermal",
       "target": "emissivitycalculation_voxel_consensus_frames_with",
@@ -17930,7 +17429,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L158",
+      "source_location": "L149",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus_stage_vote",
       "target": "emissivitycalculation_voxel_consensus_frames_with",
@@ -17941,7 +17440,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L429",
+      "source_location": "L413",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus_main",
       "target": "emissivitycalculation_voxel_consensus_py_path",
@@ -17952,7 +17451,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L308",
+      "source_location": "L299",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus_stage_thermal",
       "target": "emissivitycalculation_voxel_consensus_py_path",
@@ -17963,7 +17462,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L154",
+      "source_location": "L145",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus_stage_vote",
       "target": "emissivitycalculation_voxel_consensus_py_path",
@@ -17973,9 +17472,9 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L144",
+      "source_location": "L135",
       "weight": 1.0,
-      "source": "emissivitycalculation_voxel_consensus_rationale_144",
+      "source": "emissivitycalculation_voxel_consensus_rationale_135",
       "target": "emissivitycalculation_voxel_consensus_project_points",
       "confidence_score": 1.0
     },
@@ -17984,7 +17483,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L336",
+      "source_location": "L326",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus_stage_thermal",
       "target": "emissivitycalculation_voxel_consensus_project_points",
@@ -17995,7 +17494,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L185",
+      "source_location": "L176",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus_stage_vote",
       "target": "emissivitycalculation_voxel_consensus_project_points",
@@ -18006,7 +17505,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L440",
+      "source_location": "L424",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus_main",
       "target": "emissivitycalculation_voxel_consensus_stage_vote",
@@ -18017,112 +17516,10 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "EmissivityCalculation/voxel_consensus.py",
-      "source_location": "L441",
+      "source_location": "L425",
       "weight": 1.0,
       "source": "emissivitycalculation_voxel_consensus_main",
       "target": "emissivitycalculation_voxel_consensus_stage_thermal",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/voxel_solar_ns.py",
-      "source_location": "L190",
-      "weight": 1.0,
-      "source": "emissivitycalculation_voxel_solar_ns",
-      "target": "emissivitycalculation_voxel_solar_ns_main",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/voxel_solar_ns.py",
-      "source_location": "L145",
-      "weight": 1.0,
-      "source": "emissivitycalculation_voxel_solar_ns",
-      "target": "emissivitycalculation_voxel_solar_ns_outward_normal",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/voxel_solar_ns.py",
-      "source_location": "L157",
-      "weight": 1.0,
-      "source": "emissivitycalculation_voxel_solar_ns",
-      "target": "emissivitycalculation_voxel_solar_ns_run_sun_incidence",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/voxel_solar_ns.py",
-      "source_location": "L1",
-      "weight": 1.0,
-      "source": "emissivitycalculation_voxel_solar_ns_rationale_1",
-      "target": "emissivitycalculation_voxel_solar_ns",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/voxel_solar_ns.py",
-      "source_location": "L412",
-      "weight": 1.0,
-      "source": "emissivitycalculation_voxel_solar_ns_main",
-      "target": "emissivitycalculation_voxel_solar_ns_outward_normal",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/voxel_solar_ns.py",
-      "source_location": "L146",
-      "weight": 1.0,
-      "source": "emissivitycalculation_voxel_solar_ns_rationale_146",
-      "target": "emissivitycalculation_voxel_solar_ns_outward_normal",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/voxel_solar_ns.py",
-      "source_location": "L422",
-      "weight": 1.0,
-      "source": "emissivitycalculation_voxel_solar_ns_main",
-      "target": "emissivitycalculation_voxel_solar_ns_run_sun_incidence",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/voxel_solar_ns.py",
-      "source_location": "L158",
-      "weight": 1.0,
-      "source": "emissivitycalculation_voxel_solar_ns_rationale_158",
-      "target": "emissivitycalculation_voxel_solar_ns_run_sun_incidence",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/voxel_u_value.py",
-      "source_location": "L94",
-      "weight": 1.0,
-      "source": "emissivitycalculation_voxel_u_value",
-      "target": "emissivitycalculation_voxel_u_value_main",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "EmissivityCalculation/voxel_u_value.py",
-      "source_location": "L1",
-      "weight": 1.0,
-      "source": "emissivitycalculation_voxel_u_value_rationale_1",
-      "target": "emissivitycalculation_voxel_u_value",
       "confidence_score": 1.0
     },
     {
@@ -19575,7 +18972,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "OpenStudioModel/show_planes.py",
-      "source_location": "L129",
+      "source_location": "L116",
       "weight": 1.0,
       "source": "openstudiomodel_show_planes_main",
       "target": "openstudiomodel_fit_planes_load_merged_cloud"
@@ -19597,7 +18994,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "OpenStudioModel/show_planes.py",
-      "source_location": "L132",
+      "source_location": "L119",
       "weight": 1.0,
       "source": "openstudiomodel_show_planes_main",
       "target": "openstudiomodel_fit_planes_crop_roi"
@@ -19629,7 +19026,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "OpenStudioModel/show_planes.py",
-      "source_location": "L134",
+      "source_location": "L121",
       "weight": 1.0,
       "source": "openstudiomodel_show_planes_main",
       "target": "openstudiomodel_fit_planes_statistical_outlier_removal"
@@ -19715,7 +19112,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "OpenStudioModel/show_planes.py",
-      "source_location": "L137",
+      "source_location": "L124",
       "weight": 1.0,
       "source": "openstudiomodel_show_planes_main",
       "target": "openstudiomodel_fit_planes_declutter"
@@ -19924,119 +19321,6 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/fit_window_polygons.py",
-      "source_location": "L57",
-      "weight": 1.0,
-      "source": "openstudiomodel_fit_window_polygons",
-      "target": "openstudiomodel_fit_window_polygons_find_plane",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/fit_window_polygons.py",
-      "source_location": "L84",
-      "weight": 1.0,
-      "source": "openstudiomodel_fit_window_polygons",
-      "target": "openstudiomodel_fit_window_polygons_main",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/fit_window_polygons.py",
-      "source_location": "L73",
-      "weight": 1.0,
-      "source": "openstudiomodel_fit_window_polygons",
-      "target": "openstudiomodel_fit_window_polygons_outward_normal",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/fit_window_polygons.py",
-      "source_location": "L64",
-      "weight": 1.0,
-      "source": "openstudiomodel_fit_window_polygons",
-      "target": "openstudiomodel_fit_window_polygons_plane_axes",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/fit_window_polygons.py",
-      "source_location": "L1",
-      "weight": 1.0,
-      "source": "openstudiomodel_fit_window_polygons_rationale_1",
-      "target": "openstudiomodel_fit_window_polygons",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/fit_window_polygons.py",
-      "source_location": "L198",
-      "weight": 1.0,
-      "source": "openstudiomodel_fit_window_polygons_main",
-      "target": "openstudiomodel_fit_window_polygons_find_plane",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/fit_window_polygons.py",
-      "source_location": "L229",
-      "weight": 1.0,
-      "source": "openstudiomodel_fit_window_polygons_main",
-      "target": "openstudiomodel_fit_window_polygons_plane_axes",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/fit_window_polygons.py",
-      "source_location": "L65",
-      "weight": 1.0,
-      "source": "openstudiomodel_fit_window_polygons_rationale_65",
-      "target": "openstudiomodel_fit_window_polygons_plane_axes",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/fit_window_polygons.py",
-      "source_location": "L226",
-      "weight": 1.0,
-      "source": "openstudiomodel_fit_window_polygons_main",
-      "target": "openstudiomodel_fit_window_polygons_outward_normal",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/parse_arpav.py",
-      "source_location": "L40",
-      "weight": 1.0,
-      "source": "openstudiomodel_parse_arpav",
-      "target": "openstudiomodel_parse_arpav_main",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/parse_arpav.py",
-      "source_location": "L1",
-      "weight": 1.0,
-      "source": "openstudiomodel_parse_arpav_rationale_1",
-      "target": "openstudiomodel_parse_arpav",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
       "source_file": "OpenStudioModel/show_planes.py",
       "source_location": "L29",
       "weight": 1.0,
@@ -20069,7 +19353,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "OpenStudioModel/show_planes.py",
-      "source_location": "L146",
+      "source_location": "L133",
       "weight": 1.0,
       "source": "openstudiomodel_show_planes_main",
       "target": "openstudiomodel_show_planes_assign_labels",
@@ -20083,119 +19367,6 @@
       "weight": 1.0,
       "source": "openstudiomodel_show_planes_rationale_30",
       "target": "openstudiomodel_show_planes_assign_labels",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/sun_incidence.py",
-      "source_location": "L71",
-      "weight": 1.0,
-      "source": "openstudiomodel_sun_incidence",
-      "target": "openstudiomodel_sun_incidence_local_bearing_deg",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/sun_incidence.py",
-      "source_location": "L76",
-      "weight": 1.0,
-      "source": "openstudiomodel_sun_incidence",
-      "target": "openstudiomodel_sun_incidence_main",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/sun_incidence.py",
-      "source_location": "L67",
-      "weight": 1.0,
-      "source": "openstudiomodel_sun_incidence",
-      "target": "openstudiomodel_sun_incidence_wall_planes",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/sun_incidence.py",
-      "source_location": "L1",
-      "weight": 1.0,
-      "source": "openstudiomodel_sun_incidence_rationale_1",
-      "target": "openstudiomodel_sun_incidence",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/sun_incidence.py",
-      "source_location": "L114",
-      "weight": 1.0,
-      "source": "openstudiomodel_sun_incidence_main",
-      "target": "openstudiomodel_sun_incidence_wall_planes",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/sun_incidence.py",
-      "source_location": "L122",
-      "weight": 1.0,
-      "source": "openstudiomodel_sun_incidence_main",
-      "target": "openstudiomodel_sun_incidence_local_bearing_deg",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/to_openstudio.py",
-      "source_location": "L42",
-      "weight": 1.0,
-      "source": "openstudiomodel_to_openstudio",
-      "target": "openstudiomodel_to_openstudio_fix_winding",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/to_openstudio.py",
-      "source_location": "L53",
-      "weight": 1.0,
-      "source": "openstudiomodel_to_openstudio",
-      "target": "openstudiomodel_to_openstudio_main",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/to_openstudio.py",
-      "source_location": "L1",
-      "weight": 1.0,
-      "source": "openstudiomodel_to_openstudio_rationale_1",
-      "target": "openstudiomodel_to_openstudio",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/to_openstudio.py",
-      "source_location": "L103",
-      "weight": 1.0,
-      "source": "openstudiomodel_to_openstudio_main",
-      "target": "openstudiomodel_to_openstudio_fix_winding",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "rationale_for",
-      "confidence": "EXTRACTED",
-      "source_file": "OpenStudioModel/to_openstudio.py",
-      "source_location": "L43",
-      "weight": 1.0,
-      "source": "openstudiomodel_to_openstudio_rationale_43",
-      "target": "openstudiomodel_to_openstudio_fix_winding",
       "confidence_score": 1.0
     },
     {
@@ -29202,5 +28373,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "43c659ce785042099d4936f0386e22885116c29f"
+  "built_at_commit": "8d51df86b19033dc8a19a3ce000e0140758cfb1e"
 }

@@ -6,12 +6,12 @@
 % gia' espressi nel frame mappa, quindi i frame successivi si possono
 % concatenare direttamente senza applicare alcuna trasformazione.
 
-clear
 close all
 clc
+clear
 
 %% 1. Parametri
-bagPath    = 'C:\Users\loren\Desktop\Dati_vfinal\SLAM\Lidar\rosbag2_2026_07_30-18_12_20';
+bagPath    = "C:\Users\loren\Desktop\Dati_vfinal\SLAM\Lidar\rosbag2_2026_07_30-18_12_20";
 topicName  = '/cloud_registered';
 
 frameStep  = 1;      % 1 = tutti i frame. Alzare (es. 5) se la memoria non basta.
@@ -75,9 +75,9 @@ pc = pointCloud(xyz);
 % tra loro e quindi non risultano "isolati".
 % Mettere useROI = false per disattivarlo e vedere la nuvola intera.
 useROI = true;
-roi = [-Inf Inf, ...    % X min max
-       -1 1.5, ...    % Y min max
-       -Inf 4.0];       % Z min max, taglia sopra i 4 m
+roi = [12 Inf, ...    % X min max
+       -0.95 0.5, ...    % Y min max
+       -Inf Inf];       % Z min max, taglia sopra i 4 m
 
 if useROI
     inIdx  = findPointsInROI(pc, roi);
@@ -93,8 +93,8 @@ end
 % sparpagliamento diffuso e sui ritorni spuri singoli.
 % Alzare threshold = filtro piu' permissivo, abbassarlo = piu' aggressivo.
 useDenoise   = true;
-denoiseK     = 20;    % numero di vicini considerati
-denoiseThres = 1.0;   % soglia in deviazioni standard
+denoiseK     = 80;    % numero di vicini considerati
+denoiseThres = 3;   % soglia in deviazioni standard
 
 if useDenoise
     nBefore = pc.Count;

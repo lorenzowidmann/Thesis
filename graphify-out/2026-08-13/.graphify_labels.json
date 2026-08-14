@@ -58,21 +58,5 @@
   "56": "main",
   "57": "merge_planar_surface",
   "58": "camera_server.py",
-  "59": "ffprobe_frame_count",
-  "60": "segmentation.py",
-  "61": "projection.py",
-  "62": "project_to_flir.py",
-  "63": "rig_calibration.py",
-  "64": "ImageSource",
-  "65": "MaterialClassifier",
-  "66": "voxel_solar_ns.py",
-  "67": "fit_window_polygons.py",
-  "68": "sun_incidence.py",
-  "69": "to_openstudio.py",
-  "70": "_rotate_surface_back",
-  "71": "add_surface_hsi.py",
-  "72": "make_synthetic_thermal_voxels.py",
-  "73": "view_u_voxels.py",
-  "74": "voxel_u_value.py",
-  "75": "parse_arpav.py"
+  "59": "ffprobe_frame_count"
 }
