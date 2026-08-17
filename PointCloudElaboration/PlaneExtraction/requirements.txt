@@ -1,0 +1,11 @@
+numpy
+rosbags        # rosbag2 .db3 read -- normal PyPI package
+open3d         # numpy -> .ply intermediate write -- normal PyPI package
+# easy3d       -- DO NOT `pip install easy3d`: PyPI's "easy3d" (0.1.1) is an
+#                 unrelated, unaffiliated stub package (camera-pose viewer
+#                 only), not github.com/LiangliangNan/Easy3D. Download the
+#                 matching wheel from that repo's GitHub Releases instead,
+#                 e.g. for Python 3.12 / Windows:
+#                 https://github.com/LiangliangNan/Easy3D/releases
+#                   -> easy3d-2.6.1-cp312-cp312-win_amd64.whl
+#                 pip install easy3d-2.6.1-cp312-cp312-win_amd64.whl
