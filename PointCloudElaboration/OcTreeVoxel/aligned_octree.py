@@ -41,13 +41,13 @@ from pathlib import Path
 
 import numpy as np
 
-from fit_planes import canonical_normal_offset, close_geometry, load_merged_cloud
+from fit_closed_planes import canonical_normal_offset, close_geometry, load_merged_cloud
 from octree import build_octree, leaf_voxels, level_counts, verify_nonempty, voxelize, voxelize_octree
 
 
 def _axis_of(plane):
     """Index (0/1/2 = X/Y/Z) of the world axis a plane's normal is nearest
-    to -- same convention as fit_planes.close_geometry's axis grouping."""
+    to -- same convention as fit_closed_planes.close_geometry's axis grouping."""
     return int(np.argmax(np.abs(np.asarray(plane["normal"]))))
 
 
@@ -142,7 +142,7 @@ def apply_rigid(points, R, t):
 
 def align_and_reclose_planes(planes, R, t):
     """Rotate every plane's geometry into the aligned frame, then re-close
-    the box with fit_planes.close_geometry -- reused, not reimplemented.
+    the box with fit_closed_planes.close_geometry -- reused, not reimplemented.
 
     close_geometry's box in planes.json was already axis-snapped once, but
     only against the *original* (pre-alignment) frame's X/Y/Z: it groups

@@ -72,7 +72,7 @@ camera zoom and point size, so reusing them would fire both at once.
 
 ## Output
 
-- `planes.json` -- same schema as `fit_planes.py`: `normal`, `d`,
+- `planes.json` -- `normal`, `d`,
   `orientation` (`wall` / `floor_ceiling`), `tilt_deg`, `centroid_3d`,
   `corners_3d`, etc. Closed box only (`close_geometry` + `cap_open_faces`
   always on), no free-standing fragments. Still in the raw SLAM frame.
@@ -96,10 +96,15 @@ camera zoom and point size, so reusing them would fire both at once.
 
 ## Provenance (self-contained copies, adapted where noted)
 
-- `fit_planes.py` -- copied verbatim from `Thesis/OpenStudioModel/fit_planes.py`.
-  `fit_closed_planes.py` imports `load_merged_cloud`, `segment_planes`,
-  `dedupe_planes`, `close_geometry` from it directly; `aligned_octree.py`
-  also imports `canonical_normal_offset`, `close_geometry`, `load_merged_cloud`.
+- `fit_closed_planes.py`'s RANSAC plane-fitting logic (`load_merged_cloud`,
+  `segment_planes`, `dedupe_planes`, `close_geometry`, `tilt_from_structure_deg`,
+  and their helpers) started as a copy of `Thesis/OpenStudioModel/fit_planes.py`,
+  trimmed to what this pipeline actually uses (dropped the unused ROI/SOR/
+  declutter CLI options) and folded into this one file rather than kept as a
+  separate imported module, since nothing else in this pipeline needs those
+  functions except through `fit_closed_planes.py`. `aligned_octree.py`
+  imports `canonical_normal_offset`, `close_geometry`, `load_merged_cloud`
+  from it; `view_voxels.py` imports `load_merged_cloud`.
 - `octree/octree.py` -- copied verbatim from
   `PointCloudElaboration/OcTree/octree/octree.py` (numpy-only, no adaptation
   needed).

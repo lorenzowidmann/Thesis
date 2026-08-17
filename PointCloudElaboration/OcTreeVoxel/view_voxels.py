@@ -78,8 +78,9 @@ def drop_floating_voxels(centers, origin, voxel_size):
     (recovering each voxel's integer (i,j,k) cell index from its center,
     inverting voxelizer.py's `center = (idx + 0.5) * voxel_size + origin`)
     and drops every component except the largest -- the same "declutter"
-    idea fit_planes.py already applies to raw points (its cluster_labels/
-    largest_cluster_mask), just done on the voxel grid instead. 26-connected
+    idea fit_closed_planes.py already applies to raw points (its
+    cluster_labels/largest_cluster_mask), just done on the voxel grid
+    instead. 26-connected
     (any shared face, edge, or corner counts as touching) matches how
     adjacent cubes visually read as "connected" in the render.
 
@@ -149,10 +150,10 @@ def load_box_wireframe(planes_aligned_path):
 
 
 def load_aligned_points(transform_path, stride=1):
-    """Re-load the raw bag (fit_planes.load_merged_cloud) and re-apply the
-    same rigid transform aligned_octree.py used -- for display only, not
-    recomputed from the voxels."""
-    from fit_planes import load_merged_cloud
+    """Re-load the raw bag (fit_closed_planes.load_merged_cloud) and
+    re-apply the same rigid transform aligned_octree.py used -- for display
+    only, not recomputed from the voxels."""
+    from fit_closed_planes import load_merged_cloud
 
     t = json.loads(Path(transform_path).read_text())
     xyz = load_merged_cloud(Path(t["bag"]), t["topic"], t["store"])
