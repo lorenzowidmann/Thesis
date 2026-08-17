@@ -3,3 +3,6 @@ __pycache__/
 
 # Calibration capture frames (large, machine-specific)
 Calibration/ZedCaptures/
+
+# graphify output -- regenerated locally via `graphify update .`, not tracked
+graphify-out/
