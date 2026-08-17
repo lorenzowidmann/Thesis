@@ -1,19 +1,21 @@
-# AlignedOctree — full-building leveling + octree voxelization
+# AlignedOctree — full-building leveling + octree voxelization + viewer
 
 Self-contained (no cross-import from OpenStudioModel or OcTree -- the files
-it reuses are copied in, see "Provenance" below). Two-step pipeline:
+it reuses are copied in, see "Provenance" below). Three-step pipeline:
 
 1. **`fit_closed_planes.py`** -- RANSAC-fits a single watertight box (floor,
    ceiling, 4 walls) from the raw LiDAR point cloud. Writes `planes.json`.
 2. **`aligned_octree.py`** -- derives a 3-axis "building frame" rotation from
    that closed box, applies it (+ a translation putting the floor at z=0) as
    a rigid transform to the *entire* raw cloud, then octree-voxelizes the
-   now axis-aligned result. Writes `voxels.npz` + `transform.json`.
+   now axis-aligned result. Writes `voxels.npz`, `transform.json`, and
+   `planes_aligned.json` (the closed box re-derived *in* the aligned frame).
 3. **`view_voxels.py`** -- pyvista viewer for `voxels.npz`: cubes colored by
    point count (no semantic classes here), with the closed box from
-   `planes.json` overlaid in the same aligned frame as a sanity check, and an
-   optional raw-points overlay. Interactive window by default, or
-   `--screenshot out.png` for a headless render.
+   `planes_aligned.json` overlaid as a sanity check (should meet the voxel
+   walls at an exact 90 degrees), and an optional raw-points overlay.
+   Interactive window by default, with live keyboard controls (see below),
+   or `--screenshot out.png` / `--orbit-gif out.gif` for a headless render.
 
 ## Why
 
@@ -33,7 +35,7 @@ No thermal/temperature averaging per voxel yet -- geometry/alignment only.
 
 ```
 C:\venvs\planefit\Scripts\python.exe fit_closed_planes.py --bag <rosbag2_folder> --out planes.json
-C:\venvs\planefit\Scripts\python.exe aligned_octree.py --planes planes.json --depth 8
+C:\venvs\planefit\Scripts\python.exe aligned_octree.py --planes planes.json --voxel-size 0.15
 C:\venvs\planefit\Scripts\python.exe view_voxels.py
 ```
 
@@ -47,27 +49,57 @@ x,y,z float32, frame_id=camera_init).
 *only* to compute the alignment transform, every point in the bag is still
 loaded and transformed, none are clipped/dropped by plane membership.
 
+`aligned_octree.py --voxel-size 0.15` voxelizes at an arbitrary metric size
+(plain uniform grid, `octree.voxelize`). Omit it and use `--depth N` instead
+for the power-of-two octree lattice (`build_octree` / `voxelize_octree`,
+edge = root_extent / 2**depth) -- the paper's literal recursive-subdivision
+method; an arbitrary size like 0.15 m generally isn't reachable that way for
+any integer depth.
+
 See each script's module docstring (`--help`) for the full flag list.
+
+### `view_voxels.py` live keys (interactive window only)
+
+| Key | Effect |
+|---|---|
+| `]` | raise the min-count filter by `--min-count-step` (default 1) |
+| `[` | lower it |
+| `0` | reset min-count to 1 (show every voxel) |
+| `d` | toggle declutter (drop voxels not in the largest 26-connected component -- on by default; raising min-count can strand a voxel that used to touch a since-hidden neighbour) |
+
+Not bound to `+`/`-`/arrow keys: pyvista's own defaults already use those for
+camera zoom and point size, so reusing them would fire both at once.
 
 ## Output
 
 - `planes.json` -- same schema as `fit_planes.py`: `normal`, `d`,
   `orientation` (`wall` / `floor_ceiling`), `tilt_deg`, `centroid_3d`,
-  `corners_3d`, etc. Closed box only (`--close-geometry` + `cap_open_faces`
-  always on), no free-standing fragments.
+  `corners_3d`, etc. Closed box only (`close_geometry` + `cap_open_faces`
+  always on), no free-standing fragments. Still in the raw SLAM frame.
 - `voxels.npz` -- `centers` (M,3), `counts` (M,), `voxel_size` (scalar),
-  `origin` (3,), `depth` (scalar): occupied voxel centers + point counts of
-  the aligned cloud, same fields `octree/voxelizer.py`'s `VoxelGrid` produces.
+  `origin` (3,), `depth` (scalar, or `-1` if built with `--voxel-size`):
+  occupied voxel centers + point counts of the aligned cloud, same fields
+  `octree/voxelizer.py`'s `VoxelGrid` produces.
 - `transform.json` -- `rotation` (3x3), `translation` (3,) and their inverse
   (`rotation_inv`, `translation_inv`), so voxel coordinates can be mapped
   back to the original SLAM/map (`camera_init`) frame later. Row-vector
   convention: `aligned = points @ rotation.T + translation`.
+- `planes_aligned.json` -- the closed box re-derived *in* the aligned frame
+  (`aligned_octree.align_and_reclose_planes`). Not just `planes.json`'s
+  corners rotated by `transform.json`: `planes.json`'s box was axis-snapped
+  against the *original* (pre-alignment) frame, which doesn't exactly match
+  the more precise rotation `aligned_octree.py` derives from the true
+  measured wall/floor normals -- naively rotating it leaves a small residual
+  tilt (a couple degrees). This file re-closes the box after rotating, so
+  it's exactly axis-aligned, consistent with the (always axis-aligned by
+  construction) voxel grid. This is what `view_voxels.py` overlays.
 
 ## Provenance (self-contained copies, adapted where noted)
 
 - `fit_planes.py` -- copied verbatim from `Thesis/OpenStudioModel/fit_planes.py`.
   `fit_closed_planes.py` imports `load_merged_cloud`, `segment_planes`,
-  `dedupe_planes`, `close_geometry` from it directly.
+  `dedupe_planes`, `close_geometry` from it directly; `aligned_octree.py`
+  also imports `canonical_normal_offset`, `close_geometry`, `load_merged_cloud`.
 - `octree/octree.py` -- copied verbatim from
   `PointCloudElaboration/OcTree/octree/octree.py` (numpy-only, no adaptation
   needed).
