@@ -1,0 +1,61 @@
+{
+  "planes_file": "planes.json",
+  "bag": "C:\\Users\\loren\\Desktop\\Dati_vfinal\\SLAM\\Lidar\\rosbag2_2026_07_30-18_12_20\\rosbag2_2026_07_30-18_12_20_filtered",
+  "topic": "/cloud_registered",
+  "store": "ROS2_HUMBLE",
+  "building_frame": {
+    "floor_plane_id": 0,
+    "ceiling_plane_id": 4,
+    "dominant_wall_axis": "X",
+    "dominant_wall_plane_ids": [
+      1,
+      5
+    ],
+    "floor_height_before_translation": -0.1675983559991767
+  },
+  "rotation": [
+    [
+      0.9989656936311175,
+      0.04518453437567294,
+      -0.005089282990160019
+    ],
+    [
+      -0.045263898910552894,
+      0.9988347879864385,
+      -0.01674054250918101
+    ],
+    [
+      0.0043269392780059665,
+      0.016953588450239015,
+      0.9998469150000636
+    ]
+  ],
+  "translation": [
+    0.0,
+    0.0,
+    0.1675983559991767
+  ],
+  "rotation_inv": [
+    [
+      0.9989656936311175,
+      -0.045263898910552894,
+      0.0043269392780059665
+    ],
+    [
+      0.04518453437567294,
+      0.9988347879864385,
+      0.016953588450239015
+    ],
+    [
+      -0.005089282990160019,
+      -0.01674054250918101,
+      0.9998469150000636
+    ]
+  ],
+  "translation_inv": [
+    -0.0007251879095020646,
+    -0.0028413935525466887,
+    -0.16757269920485923
+  ],
+  "convention": "row-vector points (N,3): aligned = points @ rotation.T + translation; world = aligned @ rotation_inv.T + translation_inv"
+}
