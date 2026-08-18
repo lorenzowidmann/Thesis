@@ -45,7 +45,7 @@ python extract_planes.py <bag_folder> [--output-dir <dir>]
     [--topic /cloud_registered] [--store ROS2_HUMBLE]
     [--min-support 1000] [--dist-threshold 0.005]
     [--bitmap-resolution 0.02] [--normal-threshold 0.8]
-    [--overlook-probability 0.001] [--normal-k 16]
+    [--overlook-probability 0.001] [--normal-k 16] [--max-tilt-deg 15]
 ```
 
 `<bag_folder>` is a rosbag2 folder (`metadata.yaml` + `.db3`) with a
@@ -60,10 +60,11 @@ python extract_planes.py "C:\Users\loren\Desktop\Dati_vfinal\SLAM\Lidar\rosbag2_
 ```
 
 ~1.07M points, ran in ~13s end-to-end (5.6s normal estimation + 1.5s RANSAC
-detection on this machine), found 56 planes (dominant floor/ceiling/wall
-faces at hundreds of thousands of points each, down to small fragments --
-raw RANSAC output, no dedupe/merge step like `OpenStudioModel/fit_planes.py`
-does).
+detection on this machine), found 57 raw planes, **27 kept** after the
+default `--max-tilt-deg 15` filter (dominant floor/ceiling/wall faces at
+tens/hundreds of thousands of points each, down to small fragments -- no
+dedupe/merge step for near-duplicate fragments yet, see
+`SurfaceReconstruction/dedupe_planes.py` for that).
 
 ## Outputs
 
@@ -90,6 +91,31 @@ never created it because it bailed out first). This script always calls
 RANSAC -- not optional, not skippable via CLI, only its `k` (`--normal-k`,
 default 16, matching Easy3D's own C++ default) is tunable. Once normals are
 estimated, saving `.bvg`/`.ply` is safe even with 0 planes found.
+
+## --max-tilt-deg: dropping diagonal artifact planes
+
+Loose RANSAC tolerances (`--dist-threshold`, `--normal-threshold`) can fit a
+mathematically legitimate but physically spurious "plane" through points
+scattered near several real floor/wall/ceiling corners at once. Caught on
+the reference bag: two "planes" tilted 52 deg and 15 deg off vertical, each
+spanning the corridor's *entire* 10.5m length -- too coincidental to be real
+diagonal architecture (no genuine feature would happen to span exactly the
+same length as the main walls).
+
+`--max-tilt-deg` (default 15, 0 = off) discards any plane whose normal isn't
+within that many degrees of vertical (floor/ceiling) or horizontal (wall),
+ported from `OpenStudioModel/fit_planes.py`'s `tilt_from_structure_deg`.
+Since Easy3D's RANSAC runs as one opaque `detect()` call (no per-candidate
+hook to reject from, unlike `fit_planes.py`'s own iterative loop), this is a
+**post-filter**: applied after `detect()`, discarded planes' points are
+relabeled back to unsegmented (-1) before saving -- so it affects the saved
+`.ply`/`.bvg`, not just what's printed. Note this only filters *tilt*
+(Z-alignment) -- a wall facing an arbitrary horizontal direction (not
+aligned to world X/Y) still passes with tilt~0, since tilt is direction-
+agnostic in the XY plane by design.
+
+On the reference bag: 57 raw planes -> 27 kept, 30 discarded (both diagonal
+artifacts included, plus a long tail of small oblique fragments).
 
 ## RANSAC parameters
 

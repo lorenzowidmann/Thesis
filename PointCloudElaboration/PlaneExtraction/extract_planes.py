@@ -31,12 +31,24 @@ diagonal_length at startup, plus what your current --dist-threshold /
 --bitmap-resolution fractions resolve to in metres, so you can sanity-check
 before waiting on a run.
 
+--max-tilt-deg (default 15, 0 = off) discards any detected plane whose
+normal isn't close to vertical (floor/ceiling) or horizontal (wall) --
+ported from OpenStudioModel/fit_planes.py's tilt_from_structure_deg. Applied
+AFTER detect() (Easy3D's RANSAC runs as one opaque call, unlike fit_planes.py's
+own iterative loop, so there's no per-candidate rejection to hook into --
+this is a post-filter, not a smarter RANSAC). Discarded planes' points are
+relabeled back to unsegmented (-1) before saving. Exists because loose RANSAC
+tolerances can fit a spurious "plane" through scattered points near several
+real floor/wall/ceiling corners at once -- caught on the reference bag:
+two "planes" at 52 deg and 15 deg off vertical, each spanning the corridor's
+*entire* length, too coincidental to be real diagonal architecture.
+
 Usage:
     python extract_planes.py <bag_folder> --output-dir <dir>
         [--topic /cloud_registered] [--store ROS2_HUMBLE]
         [--min-support 1000] [--dist-threshold 0.005]
         [--bitmap-resolution 0.02] [--normal-threshold 0.8]
-        [--overlook-probability 0.001] [--normal-k 16]
+        [--overlook-probability 0.001] [--normal-k 16] [--max-tilt-deg 15]
 
 New pip dependencies -- READ BEFORE INSTALLING:
     rosbags   -- normal PyPI package, `pip install rosbags`.
@@ -105,6 +117,16 @@ def read_bag(bag_path, topic, store_name):
     return xyz, frame_id
 
 
+def tilt_from_structure_deg(normal):
+    """Angle (deg) of `normal` from the nearest Manhattan-aligned orientation:
+    0 deg = exactly vertical (floor/ceiling) or exactly horizontal (wall),
+    45 deg = worst case, exactly diagonal between the two. Assumes Z is up.
+    Same as OpenStudioModel/fit_planes.py's tilt_from_structure_deg."""
+    n = np.asarray(normal) / np.linalg.norm(normal)
+    angle_to_vertical = np.degrees(np.arccos(np.clip(abs(n[2]), 0.0, 1.0)))
+    return min(angle_to_vertical, abs(90.0 - angle_to_vertical))
+
+
 # --------------------------------------------------------------------------- #
 # CLI                                                                          #
 # --------------------------------------------------------------------------- #
@@ -131,6 +153,11 @@ def build_parser():
                     help="cosine of the max normal deviation allowed (default: 0.8)")
     p.add_argument("--overlook-probability", type=float, default=0.001,
                     help="probability a primitive is overlooked (default: 0.001)")
+
+    # Post-filter, not a RANSAC parameter -- see module docstring.
+    p.add_argument("--max-tilt-deg", type=float, default=15.0,
+                    help="discard planes not close to floor/ceiling/wall orientation "
+                         "(0 = keep everything RANSAC found; default: 15)")
 
     # Prerequisite for RANSAC to do anything at all -- not one of the five
     # tutorial RANSAC parameters, but exposed since it directly affects
@@ -206,9 +233,38 @@ def main(argv=None):
         args.overlook_probability,
     )
 
+    # --- max-tilt-deg post-filter: demote planes not close to floor/ceiling/
+    # wall back to unsegmented (-1), BEFORE saving -- see module docstring ---
+    all_planes = ransac.get_planes()
+    kept, discarded = [], []
+    for p in all_planes:
+        n = p.normal
+        tilt = tilt_from_structure_deg((n.x, n.y, n.z))
+        if args.max_tilt_deg > 0 and tilt > args.max_tilt_deg:
+            discarded.append((p, tilt))
+        else:
+            kept.append(p)
+
+    if discarded:
+        idx_prop = cloud.get_vertex_property("v:primitive_index", int)
+        type_prop = cloud.get_vertex_property("v:primitive_type", int)
+        Vertex = easy3d.PointCloud.Vertex
+        UNKNOWN = easy3d.PrimitivesRansac.UNKNOWN
+        print(f"\n--max-tilt-deg {args.max_tilt_deg}: discarding {len(discarded)} plane(s) "
+              f"not close to floor/ceiling/wall:")
+        for p, tilt in discarded:
+            print(f"  plane {p.primitive_index:>3}: {len(p.vertices):>8} points, "
+                  f"tilt={tilt:.1f} deg from vertical/horizontal -> unsegmented")
+            for vi in p.vertices:
+                v = Vertex(vi)
+                idx_prop[v] = UNKNOWN
+                if type_prop is not None:
+                    type_prop[v] = UNKNOWN
+
     # --- 5. save outputs (v:primitive_type / v:primitive_index already set on
-    # `cloud` by detect(), regardless of whether any plane was found -- safe
-    # to save either way as long as normals were estimated, see docstring) ---
+    # `cloud` by detect() + the tilt filter above, regardless of whether any
+    # plane was found -- safe to save either way as long as normals were
+    # estimated, see docstring) ---
     ok_ply = easy3d.PointCloudIO.save(str(ply_out), cloud)
     ok_bvg = easy3d.PointCloudIO.save(str(bvg_out), cloud)
     if not ok_ply:
@@ -217,13 +273,13 @@ def main(argv=None):
         print(f"WARNING: failed to save {bvg_out}")
 
     # --- 6. summary ---
-    planes = sorted(ransac.get_planes(), key=lambda p: len(p.vertices), reverse=True)
-    print(f"\n{num} plane(s) found:")
-    for p in planes:
+    kept = sorted(kept, key=lambda p: len(p.vertices), reverse=True)
+    print(f"\n{len(kept)} plane(s) kept (of {num} found):")
+    for p in kept:
         n = p.normal
         print(f"  plane {p.primitive_index:>3}: {len(p.vertices):>8} points   "
               f"normal=({n.x:+.3f}, {n.y:+.3f}, {n.z:+.3f})")
-    unsegmented = cloud.n_vertices() - sum(len(p.vertices) for p in planes)
+    unsegmented = cloud.n_vertices() - sum(len(p.vertices) for p in kept)
     print(f"  {'(unsegmented)':>10}: {unsegmented:>8} points")
 
     print(f"\nSaved:")

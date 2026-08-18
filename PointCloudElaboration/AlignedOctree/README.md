@@ -10,6 +10,13 @@ it reuses are copied in, see "Provenance" below). Three-step pipeline:
    a rigid transform to the *entire* raw cloud, then octree-voxelizes the
    now axis-aligned result. Writes `voxels.npz`, `transform.json`, and
    `planes_aligned.json` (the closed box re-derived *in* the aligned frame).
+   `--refit-box-from-voxels` additionally RANSAC-fits a second, independent
+   closed box directly to the occupied voxel centers instead of the raw
+   points, at the very end of the pipeline -- writes `planes_from_voxels.json`.
+   `--tilt-only` levels against floor/ceiling only (fixes roll/pitch), skipping
+   the wall-based yaw correction -- use when the corridor genuinely bends/
+   snakes along its length, so forcing the whole cloud's yaw to one dominant
+   wall pair pushes far segments outside the axis-aligned voxel/box overlay.
 3. **`view_voxels.py`** -- pyvista viewer for `voxels.npz`: cubes colored by
    point count (no semantic classes here), with the closed box from
    `planes_aligned.json` overlaid as a sanity check (should meet the voxel
@@ -92,14 +99,30 @@ camera zoom and point size, so reusing them would fire both at once.
   measured wall/floor normals -- naively rotating it leaves a small residual
   tilt (a couple degrees). This file re-closes the box after rotating, so
   it's exactly axis-aligned, consistent with the (always axis-aligned by
-  construction) voxel grid. This is what `view_voxels.py` overlays.
+  construction) voxel grid. This is what `view_voxels.py` overlays by
+  default (`--planes-aligned` to point it elsewhere, e.g. at
+  `planes_from_voxels.json` below).
+- `planes_from_voxels.json` -- only with `--refit-box-from-voxels`: a
+  second closed box, same schema, RANSAC-fit directly to the occupied voxel
+  *centers* (`aligned_octree.refit_box_from_voxels`) instead of the raw
+  1M-point cloud. `planes_aligned.json` only ever captures the largest/
+  straightest wall fragment per side of the *raw* cloud, so real corridor
+  irregularity (alcoves, uneven floor/ceiling, weakly-scanned end caps)
+  sits outside it despite being real occupied voxels -- on one real run,
+  ~80% of voxels fell outside `planes_aligned.json`'s box. Refitting to the
+  voxel grid itself traced the actual footprint noticeably closer (~54%
+  outside instead), though still partial -- it's still a *dominant-plane*
+  fit, so it was never going to fully bound genuine irregularity, just get
+  closer to it.
 
 ## Provenance (self-contained copies, adapted where noted)
 
 - `fit_planes.py` -- copied verbatim from `Thesis/OpenStudioModel/fit_planes.py`.
   `fit_closed_planes.py` imports `load_merged_cloud`, `segment_planes`,
   `dedupe_planes`, `close_geometry` from it directly; `aligned_octree.py`
-  also imports `canonical_normal_offset`, `close_geometry`, `load_merged_cloud`.
+  also imports `canonical_normal_offset`, `close_geometry`, `load_merged_cloud`,
+  `dedupe_planes`, `segment_planes` (the last two for `--refit-box-from-voxels`
+  -- same RANSAC functions, just fed voxel centers instead of raw points).
 - `octree/octree.py` -- copied verbatim from
   `PointCloudElaboration/OcTree/octree/octree.py` (numpy-only, no adaptation
   needed).

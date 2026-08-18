@@ -1,0 +1,12 @@
+# venv: C:\venvs\planefit (same one AlignedOctree uses -- opencv-python and
+# pyvista are already there; pyyaml (rig_calibration.py) was added for this
+# folder).
+#
+#   C:\venvs\planefit\Scripts\python.exe -m pip install -r requirements.txt
+rosbags
+opencv-python
+numpy
+scipy
+pyyaml
+pyvista
+imageio

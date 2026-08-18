@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.vostokmeta
+shadow_points.xyz
+query_points.xyz
+run.sol
+run_irradiation_ignored.xyz
+shadow_clouds/
+shadow_mask.json

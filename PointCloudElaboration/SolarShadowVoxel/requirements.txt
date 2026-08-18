@@ -1,0 +1,6 @@
+# venv: C:\venvs\planefit (same one AlignedOctree/TemperatureToVoxel use --
+# only numpy + rosbags actually needed here, no open3d/pyvista).
+#
+#   C:\venvs\planefit\Scripts\python.exe -m pip install -r requirements.txt
+numpy
+rosbags

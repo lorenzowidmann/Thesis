@@ -1,0 +1,15 @@
+numpy
+# easy3d       -- DO NOT `pip install easy3d`: PyPI's "easy3d" (0.1.1) is an
+#                 unrelated, unaffiliated stub package, not
+#                 github.com/LiangliangNan/Easy3D. Download the matching
+#                 wheel from that repo's GitHub Releases instead, e.g. for
+#                 Python 3.12 / Windows:
+#                 https://github.com/LiangliangNan/Easy3D/releases
+#                   -> easy3d-2.6.1-cp312-cp312-win_amd64.whl
+#                 pip install easy3d-2.6.1-cp312-cp312-win_amd64.whl
+#
+# polyfit      -- SAME TRAP: DO NOT `pip install polyfit` (unrelated PyPI
+#                 stub, v1.0/0.1). Get the real one from
+#                 https://github.com/LiangliangNan/PolyFit/releases
+#                   -> polyfit-1.6.0-cp312-cp312-win_amd64.whl
+#                 pip install polyfit-1.6.0-cp312-cp312-win_amd64.whl

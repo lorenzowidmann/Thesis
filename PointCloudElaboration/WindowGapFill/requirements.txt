@@ -1,0 +1,10 @@
+# venv: C:\venvs\planefit (same one AlignedOctree/TemperatureToVoxel/
+# MaterialToVoxel use -- numpy/scipy/pyvista/matplotlib already there;
+# rosbags only needed transitively if view_window_gaps.py's --points is used
+# (it imports MaterialToVoxel's load_merged_cloud for that).
+#
+#   C:\venvs\planefit\Scripts\python.exe -m pip install -r requirements.txt
+numpy
+scipy
+pyvista
+matplotlib

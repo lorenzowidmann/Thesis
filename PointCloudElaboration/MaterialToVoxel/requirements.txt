@@ -1,0 +1,14 @@
+# venv: C:\venvs\planefit (same one TemperatureToVoxel/AlignedOctree use --
+# opencv-python and pyyaml are already there for rig_calibration.py/projection.py;
+# scipy/pyvista/matplotlib/imageio added for view_voxels.py: declutter,
+# rendering, the categorical colormap, and --orbit-gif respectively).
+#
+#   C:\venvs\planefit\Scripts\python.exe -m pip install -r requirements.txt
+rosbags
+opencv-python
+numpy
+pyyaml
+scipy
+pyvista
+matplotlib
+imageio
