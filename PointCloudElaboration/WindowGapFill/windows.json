@@ -1,0 +1,71 @@
+{
+  "schema": "window_gap_fill/v1",
+  "generated_by": "find_window_gaps.py",
+  "source_voxels": "..\\AlignedOctree\\voxels.npz",
+  "source_planes_aligned": "C:\\Users\\loren\\Desktop\\Measurment_v2\\ClaudeCode\\Thesis\\PointCloudElaboration\\AlignedOctree\\planes_aligned.json",
+  "params": {
+    "wall_tol_m": 0.3,
+    "floor_margin_m": 0.3,
+    "closing_iterations": 2,
+    "min_hole_cells": 6,
+    "max_hole_cells": 400
+  },
+  "windows": [
+    {
+      "window_id": 0,
+      "wall_id": 3,
+      "n_cells": 30,
+      "area_m2": 0.075,
+      "x_range": [
+        25.38,
+        25.63
+      ],
+      "z_range": [
+        0.758,
+        0.958
+      ]
+    },
+    {
+      "window_id": 1,
+      "wall_id": 3,
+      "n_cells": 295,
+      "area_m2": 0.738,
+      "x_range": [
+        29.73,
+        30.58
+      ],
+      "z_range": [
+        0.958,
+        1.858
+      ]
+    },
+    {
+      "window_id": 2,
+      "wall_id": 3,
+      "n_cells": 45,
+      "area_m2": 0.113,
+      "x_range": [
+        32.98,
+        33.38
+      ],
+      "z_range": [
+        1.658,
+        1.858
+      ]
+    },
+    {
+      "window_id": 3,
+      "wall_id": 3,
+      "n_cells": 94,
+      "area_m2": 0.235,
+      "x_range": [
+        33.23,
+        33.63
+      ],
+      "z_range": [
+        0.958,
+        1.458
+      ]
+    }
+  ]
+}
