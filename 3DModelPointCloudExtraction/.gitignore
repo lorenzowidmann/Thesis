@@ -1,0 +1,8 @@
+# Ignore everything except code and this doc; data/outputs stay local only.
+*
+
+!*/
+!.gitignore
+!README.md
+!*.m
+!*.py
