@@ -11,10 +11,10 @@ close all
 clc
 
 %% 1. Parameters
-bagPath    = "C:\Users\loren\Desktop\Dati_vfinal\SLAM\Lidar\rosbag2_2026_07_30-18_12_20\rosbag2_2026_07_30-18_12_20_0.db3";
+bagPath    = "C:\Users\loren\Desktop\Dati_vfinal\SLAM\Lidar\rosbag2_2026_07_30-17_50_45\rosbag2_2026_07_30-17_50_45_0.db3";
 topicName  = '/cloud_registered';
 
-frameStep  = 1;      % 1 = all frames. Raise it (e.g. 5) if memory is not enough.
+frameStep  = 5;      % 1 = all frames. Raise it (e.g. 5) if memory is not enough.
 maxFrames  = Inf;    % limit on frames to read, Inf = no limit
 voxelSize  = 0.05;   % m, voxel size for downsampling. 0 = disabled
 markerSize = 20;     % point size on screen. pcshow's default is tiny
@@ -73,9 +73,9 @@ pc = pointCloud(xyz);
 % "isolated".
 % Set useROI = false to disable it and see the whole cloud.
 useROI = true;
-roi = [12 Inf, ...    % X min max
-       -1.8 2, ...    % Y min max
-       -Inf Inf];     % Z min max, cuts above 4 m
+roi = [-Inf Inf, ...    % X min max
+       -Inf Inf, ...    % Y min max
+       -10 10];     % Z min max, cuts above 4 m
 
 if useROI
     inIdx  = findPointsInROI(pc, roi);
