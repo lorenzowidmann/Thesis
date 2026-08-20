@@ -1,153 +1,154 @@
-%% Correzione mappa su bag FAST-LIO gia' processata, SENZA loop closure
+%% Map correction on an already-processed FAST-LIO bag, WITHOUT loop closure
 %
-% Variante di LoopClosure_v2.m che rimuove interamente la ricerca/verifica
-% dei loop (Scan Context + ICP + vincoli di loop nel pose graph) e usa SOLO:
-%   - il vincolo di gravita' (riallineamento assetto sul pavimento + fattore
-%     di gravita' nel pose graph)
-%   - i vincoli temporali (taglio finestra traiettoria, troncamento alla
-%     prima divergenza odometria/velocita' implausibile)
-%   - le altre correzioni di deriva non basate sui loop (yaw sui muri, quota
-%     Z diretta dal pavimento)
-% In piu' aggiunge un filtro di rimozione outlier (statistico, pcdenoise),
-% sia a livello di singolo keyframe sia sulla mappa finale ricostruita.
+% Variant of LoopClosure_v2.m that entirely removes loop search/verification
+% (Scan Context + ICP + loop constraints in the pose graph) and uses ONLY:
+%   - the gravity constraint (attitude realignment on the floor + gravity
+%     factor in the pose graph)
+%   - the temporal constraints (trajectory window cut, truncation at the
+%     first implausible odometry/speed divergence)
+%   - the other drift corrections not based on loops (yaw on the walls,
+%     Z height directly from the floor)
+% In addition it adds an outlier removal filter (statistical, pcdenoise),
+% both at the single-keyframe level and on the final reconstructed map.
 %
-% APPROCCIO
-% 1. Si leggono le pose da /Odometry
-% 2. Si riportano le nuvole nel frame body invertendo la posa (un-transform)
-% 3. Si selezionano keyframe, si filtrano gli outlier per nuvola
-% 4. Si riallinea l'assetto a gravita' (pavimento) e lo yaw (muri)
-% 5. Si costruisce un pose graph con SOLI vincoli sequenziali + gravita'
-% 6. Si ottimizza e si ricostruisce la mappa con le pose corrette
+% APPROACH
+% 1. Poses are read from /Odometry
+% 2. The clouds are brought back to the body frame by inverting the pose (un-transform)
+% 3. Keyframes are selected, outliers are filtered per cloud
+% 4. Attitude is realigned to gravity (floor) and yaw (walls)
+% 5. A pose graph is built with ONLY sequential + gravity constraints
+% 6. It is optimized and the map is reconstructed with the corrected poses
 %
-% REQUISITI: ROS Toolbox, Lidar Toolbox, Navigation Toolbox, Computer Vision Toolbox
+% REQUIREMENTS: ROS Toolbox, Lidar Toolbox, Navigation Toolbox, Computer Vision Toolbox
 
 clear
 close all
 clc
 
-%% 1. Parametri
+%% 1. Parameters
 bagPath = "C:\Users\loren\Desktop\Dati_vfinal\SLAM\Lidar\rosbag2_2026_07_30-17_50_45\rosbag2_2026_07_30-17_50_45_0.db3";
 
-% Selezione keyframe: un nuovo keyframe quando ci si e' spostati di
-% kfDistance metri OPPURE ruotati di kfAngle gradi rispetto al precedente.
+% Keyframe selection: a new keyframe when the sensor has moved by
+% kfDistance meters OR rotated by kfAngle degrees relative to the previous one.
 kfDistance = 1.0;    % m
-kfAngle    = 15;     % gradi
+kfAngle    = 15;     % degrees
 
-% Taglio della traiettoria a una finestra [inizio, fine] in secondi.
-% Vincolo TEMPORALE: utile sia per scartare la coda del percorso (es. il
-% ritorno che si sovrappone al corridoio di andata, generando doppioni
-% nella mappa) sia per isolare un tratto, senza indovinare una soglia
-% spaziale: una coordinata X puo' essere attraversata piu' volte in modo
-% imprevedibile (curve, avanti-indietro locale), il tempo trascorso no.
+% Cut the trajectory to a [start, end] window in seconds.
+% TEMPORAL constraint: useful both to discard the tail of the path (e.g. the
+% return leg that overlaps the outbound corridor, creating duplicates in the
+% map) and to isolate a segment, without guessing a spatial threshold: an X
+% coordinate can be crossed multiple times unpredictably (turns, local
+% back-and-forth), elapsed time cannot.
 useTimeCut      = true;
-timeCutStartSec = 10;   % s, scarta i keyframe con tempo trascorso < questo (NaN = dall'inizio)
-timeCutEndSec   = 295;  % s, scarta i keyframe con tempo trascorso > questo (NaN = fino alla fine)
+timeCutStartSec = 0;   % s, discard keyframes with elapsed time < this (NaN = from the start)
+timeCutEndSec   = 350;  % s, discard keyframes with elapsed time > this (NaN = to the end)
 
-% Downsampling applicato a ogni keyframe
+% Downsampling applied to each keyframe
 kfVoxel = 0.20;   % m
 
-% --- Filtro outlier (nuovo) -------------------------------------------
-% Rimozione statistica degli outlier: per ogni punto si guarda la distanza
-% media dai suoi NumNeighbors vicini piu' prossimi; i punti la cui distanza
-% media supera media + Threshold*deviazione_standard (calcolate su tutta la
-% nuvola) vengono scartati. Applicato in due punti della pipeline:
-%   - per keyframe, appena estratto (aiuta anche i fit successivi: pavimento
-%     6b, normali dei muri 6c);
-%   - sulla mappa finale ricostruita, dove compaiono anche outlier "di
-%     giunzione" tra scansioni diverse che non esistono nel singolo keyframe.
+% --- Outlier filter (new) -----------------------------------------------
+% Statistical outlier removal: for each point, look at the mean distance to
+% its NumNeighbors nearest neighbors; points whose mean distance exceeds
+% mean + Threshold*standard_deviation (computed over the whole cloud) are
+% discarded. Applied at two points in the pipeline:
+%   - per keyframe, right after extraction (this also helps the later fits:
+%     floor 6b, wall normals 6c);
+%   - on the final reconstructed map, where "seam" outliers between
+%     different scans also appear, which do not exist in the single keyframe.
 useOutlierFilterKF    = true;
-outlierKFNumNeighbors = 8;      % punti vicini usati per la statistica
-outlierKFStdFactor    = 1.5;    % soglia in deviazioni standard, piu' basso = piu' aggressivo
+outlierKFNumNeighbors = 8;      % neighboring points used for the statistic
+outlierKFStdFactor    = 1.5;    % threshold in standard deviations, lower = more aggressive
 
 useOutlierFilterMap    = true;
 outlierMapNumNeighbors = 12;
 outlierMapStdFactor    = 1.0;
 
-% Riallineamento assetto sul pavimento: vincolo di GRAVITA'.
-% Correzione della deriva di roll/pitch usando il pavimento come riferimento
-% di gravita'. Da disattivare solo se l'ambiente NON ha un pavimento piano
-% (esterni, terreno irregolare, rampe continue).
+% Attitude realignment on the floor: GRAVITY constraint.
+% Correction of roll/pitch drift using the floor as the gravity reference.
+% Disable only if the environment does NOT have a flat floor (outdoors,
+% uneven terrain, continuous ramps).
 useGravityAlign = true;
-floorBand    = 0.30;   % m, spessore della fascia bassa in cui cercare il pavimento
-floorTol     = 0.06;   % m, tolleranza di planarita' del fit
-floorMaxTilt = 50;     % gradi, inclinazione max accettata per il piano trovato
+floorBand    = 0.30;   % m, thickness of the low band in which to search for the floor
+floorTol     = 0.06;   % m, planarity tolerance of the fit
+floorMaxTilt = 50;     % degrees, max accepted tilt for the plane found
 
-% Correzione della deriva di YAW sui muri.
-% Il pavimento vincola roll e pitch ma NON lo yaw: i corridoi restano non
-% perpendicolari in pianta. I muri sono il riferimento per il terzo DOF.
-% ATTENZIONE: a differenza del pavimento, questa correzione ASSUME che
-% l'edificio sia ortogonale. Controllare sempre la dispersione stampata: se
-% non cala nettamente, l'ipotesi non regge e va disattivata.
+% YAW drift correction on the walls.
+% The floor constrains roll and pitch but NOT yaw: corridors remain
+% non-perpendicular in plan. The walls are the reference for the third DOF.
+% WARNING: unlike the floor, this correction ASSUMES the building is
+% orthogonal. Always check the printed dispersion: if it does not drop
+% clearly, the assumption does not hold and it must be disabled.
 useYawAlign = true;
-wallMaxNz   = 0.2;   % |nz| sotto cui una normale e' considerata di muro
-yawRefKF    = 40;    % keyframe iniziali usati come riferimento di azimut
-yawSmooth   = 9;     % finestra di lisciatura della stima, in keyframe
+wallMaxNz   = 0.2;   % |nz| below which a normal is considered a wall
+yawRefKF    = 40;    % initial keyframes used as azimuth reference
+yawSmooth   = 9;     % smoothing window of the estimate, in keyframes
 
-% Vincolo di gravita' DENTRO il pose graph.
-% Senza, l'ottimizzazione puo' comunque discostare l'assetto dal
-% riallineamento fatto sopra per soddisfare al meglio la sola catena
-% odometrica (rumore locale). poseGraph3D non ha fattori unari (prior), ma
-% il nodo 1 e' fissato dall'ottimizzatore: un vincolo 1->k con misura pari
-% alla posa assoluta desiderata di k si comporta come un prior su k. Per
-% vincolare SOLO roll e pitch, lasciando liberi x, y, z e yaw, si usa una
-% information matrix anisotropa: peso alto su rx,ry e peso quasi nullo (ma
-% positivo, deve restare definita positiva) sugli altri DOF.
+% Gravity constraint INSIDE the pose graph.
+% Without it, the optimization could still move the attitude away from the
+% realignment done above in order to best satisfy the odometry chain alone
+% (local noise). poseGraph3D has no unary factors (priors), but node 1 is
+% fixed by the optimizer: a 1->k constraint with a measurement equal to the
+% desired absolute pose of k behaves like a prior on k. To constrain ONLY
+% roll and pitch, leaving x, y, z and yaw free, an anisotropic information
+% matrix is used: high weight on rx,ry and near-zero (but positive, must
+% remain positive definite) weight on the other DOFs.
 useGravityFactor = true;
-infoGravRP   = 50;     % peso su roll/pitch (confrontabile con infoOdom = 100)
-infoGravFree = 1e-6;   % peso sui DOF liberi (x,y,z,yaw): quasi nullo ma > 0
+infoGravRP   = 50;     % weight on roll/pitch (comparable to infoOdom = 100)
+infoGravFree = 1e-6;   % weight on the free DOFs (x,y,z,yaw): near-zero but > 0
 
-% Vincolo di quota Z sulla traiettoria, dallo stesso pavimento di sopra.
-% floorDist e' una misura LOCALE fresca ad ogni keyframe (non porta dentro
-% la deriva accumulata): corregge la deriva Z residua che, senza loop
-% closure, nient'altro vincola.
-% floorFitMin: frazione minima di keyframe con fit pavimento valido perche'
-% il vincolo si attivi; sotto quella soglia il pavimento non e' abbastanza
-% osservato e si lascia solo il vincolo di roll/pitch di sopra.
+% Z height constraint on the trajectory, from the same floor as above.
+% floorDist is a FRESH LOCAL measurement at every keyframe (it does not carry
+% over accumulated drift): it corrects the residual Z drift that, without
+% loop closure, nothing else constrains.
+% floorFitMin: minimum fraction of keyframes with a valid floor fit for the
+% constraint to activate; below that threshold the floor is not observed
+% enough and only the roll/pitch constraint above is kept.
 floorFitMin = 0.5;
 infoGravZ   = 1e-6;
 
-% Peso dei vincoli odometrici nel pose graph.
+% Weight of the odometry constraints in the pose graph.
 infoOdom = 100;
 
-% Voxel per la mappa finale
+% Voxel size for the final map
 mapVoxel = 0.05;    % m
 
-% Crop geometrico (ROI) della mappa finale.
-% Coordinate nel frame mappa; usare Inf/-Inf per lasciare un asse libero.
-% Lo script stampa l'estensione della mappa prima di applicarlo, cosi' da
-% poter scegliere i limiti al primo giro con useMapROI = false.
+% Geometric crop (ROI) of the final map.
+% Coordinates in the map frame; use Inf/-Inf to leave an axis unbounded.
+% The script prints the map extent before applying it, so the limits can be
+% chosen on the first run with useMapROI = false.
 useMapROI = true;
 mapROI = [-Inf Inf, ...     % X min max
           -Inf 45, ...     % Y min max
           -1 4];             % Z min max
 
-% Rilevamento divergenza odometria (IMU/FAST-LIO che perde il tracking).
-% Vincolo TEMPORALE/cinematico: un salto di posizione tra due messaggi
-% consecutivi fisicamente impossibile per la velocita' del sensore segna il
-% punto da cui le pose non sono piu' fisiche e vanno scartate, non corrette.
-odomMaxSpeed = 5.0;    % m/s, velocita' massima plausibile del sensore
-odomMaxJump  = 5.0;    % m, salto massimo assoluto tollerato indipendentemente da dt
+% Odometry divergence detection (IMU/FAST-LIO losing tracking).
+% TEMPORAL/kinematic constraint: a position jump between two consecutive
+% messages that is physically impossible for the sensor's speed marks the
+% point from which poses are no longer physical and must be discarded, not
+% corrected.
+odomMaxSpeed = 5.0;    % m/s, maximum plausible sensor speed
+odomMaxJump  = 5.0;    % m, maximum absolute jump tolerated regardless of dt
 
-% Salvataggio della mappa corretta (Sezione 11), su disco come .pcd.
-% Il nome file e' generato al momento del salvataggio (Sezione 11) come
-% timestamp YY-MM-DD - HH-MM-SS, cosi' run diversi non si sovrascrivono.
+% Saving the corrected map (Section 11), to disk as .pcd.
+% The file name is generated at save time (Section 11) as a
+% YY-MM-DD - HH-MM-SS timestamp, so different runs do not overwrite each other.
 useSaveCorrectedMap = true;
 savedBagDir = 'C:\Users\loren\Desktop\Measurment_v2\ClaudeCode\Thesis\MATLAB_LoopClosure\LoopClosure_vFinal\SavedBag';
 
-%% 2. Lettura bag
+%% 2. Bag reading
 bag = ros2bagreader(bagPath);
 
 selOdom  = select(bag, 'Topic', '/Odometry');
 selCloud = select(bag, 'Topic', '/cloud_registered');
 
-fprintf('Odometry:         %d messaggi\n', selOdom.NumMessages);
-fprintf('cloud_registered: %d messaggi\n', selCloud.NumMessages);
+fprintf('Odometry:         %d messages\n', selOdom.NumMessages);
+fprintf('cloud_registered: %d messages\n', selCloud.NumMessages);
 
 odomMsgs  = readMessages(selOdom);
 cloudMsgs = readMessages(selCloud);
 
-%% 3. Conversione odometria in trasformazioni omogenee
-% nav_msgs/Odometry: pose.pose.position + pose.pose.orientation (quaternione)
+%% 3. Conversion of odometry to homogeneous transforms
+% nav_msgs/Odometry: pose.pose.position + pose.pose.orientation (quaternion)
 nOdom = numel(odomMsgs);
 posesRaw = repmat(rigidtform3d, nOdom, 1);
 tOdom = zeros(nOdom, 1);
@@ -157,7 +158,7 @@ for i = 1:nOdom
     p = m.pose.pose.position;
     q = m.pose.pose.orientation;
 
-    % quat2rotm vuole l'ordine [w x y z], ROS espone x,y,z,w
+    % quat2rotm wants order [w x y z], ROS exposes x,y,z,w
     R = quat2rotm([q.w q.x q.y q.z]);
     t = [p.x p.y p.z];
 
@@ -165,23 +166,22 @@ for i = 1:nOdom
     tOdom(i) = double(m.header.stamp.sec) + double(m.header.stamp.nanosec)*1e-9;
 end
 
-%% 3b. Troncamento alla prima divergenza dell'odometria (vincolo temporale)
-% Un salto di posizione troppo grande in troppo poco tempo non e' deriva:
-% e' l'IMU che ha perso il tracking (superficie riflettente, urto, tratto
-% senza feature). Da quel messaggio in poi tutte le pose sono inattendibili
-% e vengono scartate.
+%% 3b. Truncation at the first odometry divergence (temporal constraint)
+% A position jump too large in too little time is not drift: it's the IMU
+% losing tracking (reflective surface, bump, featureless stretch). From that
+% message onward all poses are unreliable and are discarded.
 trans = vertcat(posesRaw.Translation);
 dStep = vecnorm(diff(trans), 2, 2);
 dt    = diff(tOdom);
-dt(dt <= 0) = eps;   % evita divisioni per zero/negative su timestamp non monotoni
+dt(dt <= 0) = eps;   % avoid division by zero/negative on non-monotonic timestamps
 speedStep = dStep ./ dt;
 
 divergeIdx = find(speedStep > odomMaxSpeed | dStep > odomMaxJump, 1, 'first');
 
 if ~isempty(divergeIdx)
-    fprintf(2, ['\nATTENZIONE: divergenza odometria rilevata al messaggio %d/%d ' ...
-        '(salto %.1f m in %.3f s, velocita'' implicita %.1f m/s).\n' ...
-        'Pose troncate da qui in poi: %d messaggi scartati su %d.\n'], ...
+    fprintf(2, ['\nWARNING: odometry divergence detected at message %d/%d ' ...
+        '(jump %.1f m in %.3f s, implied speed %.1f m/s).\n' ...
+        'Poses truncated from here on: %d messages discarded out of %d.\n'], ...
         divergeIdx + 1, nOdom, dStep(divergeIdx), dt(divergeIdx), ...
         speedStep(divergeIdx), nOdom - divergeIdx, nOdom);
 
@@ -190,9 +190,9 @@ if ~isempty(divergeIdx)
     nOdom    = divergeIdx;
 end
 
-fprintf('Durata odometria utilizzabile: %.1f s\n', tOdom(end) - tOdom(1));
+fprintf('Usable odometry duration: %.1f s\n', tOdom(end) - tOdom(1));
 
-% Timestamp delle nuvole, per l'associazione
+% Cloud timestamps, for association
 nCloud = numel(cloudMsgs);
 tCloud = zeros(nCloud, 1);
 for i = 1:nCloud
@@ -200,9 +200,9 @@ for i = 1:nCloud
     tCloud(i) = double(h.sec) + double(h.nanosec)*1e-9;
 end
 
-%% 4. Associazione nuvola <-> posa per timestamp
-% Non si assume l'allineamento per indice: si cerca la posa piu' vicina nel
-% tempo a ciascuna nuvola e si scartano gli accoppiamenti troppo distanti.
+%% 4. Cloud <-> pose association by timestamp
+% Index alignment is not assumed: the pose closest in time to each cloud is
+% searched, and pairings that are too far apart are discarded.
 maxDt = 0.05;   % s
 pairCloudIdx = [];
 pairOdomIdx  = [];
@@ -215,17 +215,17 @@ for i = 1:nCloud
     end
 end
 
-fprintf('Coppie nuvola/posa associate: %d (scartate %d)\n', ...
+fprintf('Cloud/pose pairs associated: %d (discarded %d)\n', ...
     numel(pairCloudIdx), nCloud - numel(pairCloudIdx));
 
 if isempty(pairCloudIdx)
-    error(['Nessuna associazione trovata. Verificare che i timestamp dei due ' ...
-        'topic siano coerenti, oppure alzare maxDt.']);
+    error(['No association found. Check that the timestamps of the two ' ...
+        'topics are consistent, or raise maxDt.']);
 end
 
-%% 5. Selezione keyframe
-% Un nuovo keyframe quando si supera la soglia in traslazione o rotazione.
-kfSel = 1;   % il primo e' sempre keyframe
+%% 5. Keyframe selection
+% A new keyframe when the translation or rotation threshold is exceeded.
+kfSel = 1;   % the first is always a keyframe
 lastT = posesRaw(pairOdomIdx(1)).Translation;
 lastR = posesRaw(pairOdomIdx(1)).R;
 
@@ -234,7 +234,7 @@ for k = 2:numel(pairCloudIdx)
     R = posesRaw(pairOdomIdx(k)).R;
 
     dTrans = norm(T - lastT);
-    % angolo della rotazione relativa, da traccia della matrice
+    % relative rotation angle, from the trace of the matrix
     dR = lastR' * R;
     dAng = abs(rad2deg(acos(max(-1, min(1, (trace(dR) - 1) / 2)))));
 
@@ -246,47 +246,46 @@ for k = 2:numel(pairCloudIdx)
 end
 
 nKF = numel(kfSel);
-fprintf('Keyframe selezionati: %d su %d frame\n', nKF, numel(pairCloudIdx));
+fprintf('Keyframes selected: %d out of %d frames\n', nKF, numel(pairCloudIdx));
 
-%% 5b. Taglio della traiettoria a una finestra [inizio, fine] in secondi
-% Vincolo TEMPORALE, vedi nota su useTimeCut in Sezione 1. Va PRIMA
-% dell'estrazione nuvole (Sezione 6): i keyframe scartati non vengono
-% nemmeno letti dalla bag. A differenza di un taglio su coordinata
-% spaziale, il tempo trascorso e' monotono per costruzione: nessun rischio
-% di attraversamenti multipli o ambigui. NaN su un estremo lascia quel lato
-% aperto.
+%% 5b. Cut the trajectory to a [start, end] window in seconds
+% TEMPORAL constraint, see note on useTimeCut in Section 1. Goes BEFORE
+% cloud extraction (Section 6): the discarded keyframes are not even read
+% from the bag. Unlike a cut on a spatial coordinate, elapsed time is
+% monotonic by construction: no risk of multiple or ambiguous crossings.
+% NaN on one end leaves that side open.
 if useTimeCut
     tKF = tOdom(pairOdomIdx(kfSel));
-    elapsed = tKF - tKF(1);   % secondi dall'inizio DELLA BAG, non della finestra
+    elapsed = tKF - tKF(1);   % seconds from the start OF THE BAG, not of the window
     keep = true(size(elapsed));
     if ~isnan(timeCutStartSec), keep = keep & elapsed >= timeCutStartSec; end
     if ~isnan(timeCutEndSec),   keep = keep & elapsed <= timeCutEndSec;   end
 
     if all(keep)
-        warning(['useTimeCut attivo ma la finestra [%.1f, %.1f] s copre l''intera ' ...
-            'traiettoria (0-%.1f s): nessun taglio applicato.'], ...
+        warning(['useTimeCut is active but the window [%.1f, %.1f] s covers the ' ...
+            'entire trajectory (0-%.1f s): no cut applied.'], ...
             timeCutStartSec, timeCutEndSec, elapsed(end));
     elseif ~any(keep)
-        error(['La finestra [%.1f, %.1f] s non contiene nessun keyframe (traiettoria: ' ...
-            '0-%.1f s). Controllare i limiti.'], timeCutStartSec, timeCutEndSec, elapsed(end));
+        error(['The window [%.1f, %.1f] s contains no keyframes (trajectory: ' ...
+            '0-%.1f s). Check the limits.'], timeCutStartSec, timeCutEndSec, elapsed(end));
     else
         keepIdx = find(keep);
-        fprintf('Taglio traiettoria: tenuti i keyframe tra %.1f e %.1f s (%d/%d keyframe)\n', ...
+        fprintf('Trajectory cut: kept the keyframes between %.1f and %.1f s (%d/%d keyframes)\n', ...
             elapsed(keepIdx(1)), elapsed(keepIdx(end)), numel(keepIdx), numel(kfSel));
         kfSel = kfSel(keepIdx);
         nKF = numel(kfSel);
     end
 end
 
-%% 6. Estrazione nuvole nel frame body + filtro outlier per keyframe
-% /cloud_registered e' nel frame mappa: si inverte la posa per tornare al
-% frame sensore. Il filtro outlier (Sezione 1) e' applicato dopo il
-% downsampling: piu' veloce, e la densita' uniforme del voxel grid rende la
-% statistica dei vicini piu' stabile.
+%% 6. Cloud extraction in the body frame + per-keyframe outlier filter
+% /cloud_registered is in the map frame: the pose is inverted to go back to
+% the sensor frame. The outlier filter (Section 1) is applied after
+% downsampling: faster, and the uniform density of the voxel grid makes the
+% neighbor statistics more stable.
 kfClouds = cell(nKF, 1);
 kfPoses  = repmat(rigidtform3d, nKF, 1);
 
-fprintf('Estrazione nuvole keyframe...\n');
+fprintf('Extracting keyframe clouds...\n');
 nOutlierKFTotal = 0;
 for k = 1:nKF
     ci = pairCloudIdx(kfSel(k));
@@ -296,7 +295,7 @@ for k = 1:nKF
     xyz = xyz(all(isfinite(xyz), 2), :);
     pcMap = pointCloud(xyz);
 
-    % un-transform: dal frame mappa al frame body
+    % un-transform: from the map frame to the body frame
     pcBody = pctransform(pcMap, invert(posesRaw(oi)));
 
     pcDown = pcdownsample(pcBody, 'gridAverage', kfVoxel);
@@ -313,35 +312,36 @@ for k = 1:nKF
     kfPoses(k)  = posesRaw(oi);
 end
 if useOutlierFilterKF
-    fprintf('  filtro outlier per keyframe: %d punti rimossi in totale\n', nOutlierKFTotal);
+    fprintf('  per-keyframe outlier filter: %d points removed in total\n', nOutlierKFTotal);
 end
 
-% Copia dell'odometria GREZZA, senza alcun vincolo (ne' gravita', ne' yaw,
-% ne' Z, ne' pose graph): serve solo come riferimento "PRIMA" in Sezione 9,
-% per mostrare l'effetto di TUTTE le correzioni insieme rispetto a nessuna
-% correzione. kfPoses viene invece modificato in-place dalle sezioni
-% seguenti (rigidtform3d e' una value class: questa e' una copia vera).
+% Copy of the RAW odometry, with no constraint whatsoever (neither gravity,
+% nor yaw, nor Z, nor pose graph): only used as the "BEFORE" reference in
+% Section 9, to show the effect of ALL corrections together versus no
+% correction. kfPoses is instead modified in-place by the following
+% sections (rigidtform3d is a value class: this is a true copy).
 kfPosesOdomRaw = kfPoses;
 
-%% 6b. Riallineamento dell'assetto sul piano del pavimento (vincolo di gravita')
-% FAST-LIO e' allineato a gravita' (l'IMU la osserva), quindi la normale del
-% pavimento, riportata nel frame mappa, deve restare verticale lungo tutto
-% il percorso. Quando invece si inclina progressivamente, quella e' deriva
-% di assetto: la mappa "ruota" e un corridoio piano sembra scendere.
+%% 6b. Realignment of attitude onto the floor plane (gravity constraint)
+% FAST-LIO is gravity-aligned (the IMU observes it), so the floor normal,
+% brought into the map frame, must remain vertical along the whole path.
+% When it instead tilts progressively, that is attitude drift: the map
+% "rotates" and a flat corridor appears to slope down.
 %
-% Si impone quindi roll e pitch dal pavimento (2 DOF, privi di deriva per
-% costruzione) e si lasciano yaw e spostamento all'odometria, che su quelli
-% e' affidabile. La traiettoria viene re-integrata con gli assetti corretti.
+% Roll and pitch are therefore imposed from the floor (2 DOF, drift-free by
+% construction) and yaw and displacement are left to the odometry, which is
+% reliable on those. The trajectory is re-integrated with the corrected
+% attitudes.
 if useGravityAlign
-    fprintf('Riallineamento assetto sul pavimento...\n');
+    fprintf('Realigning attitude on the floor...\n');
 
-    % La fascia di ricerca parte da un PERCENTILE basso, non da min(z): un
-    % singolo punto spurio sotto il pavimento sposterebbe la fascia nel
-    % vuoto e il fit fallirebbe.
+    % The search band starts from a low PERCENTILE, not from min(z): a
+    % single spurious point below the floor would shift the band into empty
+    % space and the fit would fail.
     nBody = nan(nKF, 3);
-    % floorDist(k): distanza con segno origine-sensore -> piano pavimento,
-    % nel frame BODY. Riusata in Sezione 6d per il vincolo di quota Z sulla
-    % traiettoria, indipendente dal fit di normale qui sopra.
+    % floorDist(k): signed distance origin-sensor -> floor plane, in the
+    % BODY frame. Reused in Section 6d for the Z height constraint on the
+    % trajectory, independent of the normal fit above.
     floorDist = nan(nKF, 1);
     for k = 1:nKF
         loc = kfClouds{k}.Location;
@@ -361,9 +361,9 @@ if useGravityAlign
         floorDist(k) = -model.Parameters(4) / norm(model.Parameters(1:3));
     end
     validFloor = ~any(isnan(nBody), 2);
-    fprintf('  normali pavimento valide: %d su %d keyframe\n', nnz(validFloor), nKF);
+    fprintf('  valid floor normals: %d out of %d keyframes\n', nnz(validFloor), nKF);
 
-    % Rotazione di correzione dove il pavimento e' stato misurato
+    % Correction rotation where the floor was measured
     qC = nan(nKF, 4);
     tiltBefore = nan(nKF, 1);
     for k = 1:nKF
@@ -387,12 +387,13 @@ if useGravityAlign
         qC(k,:) = rotm2quat(C);
     end
 
-    % Nei buchi la correzione viene INTERPOLATA tra i due estremi validi:
-    % congelarla all'ultimo valore noto lascia riaccumulare l'errore.
+    % In the gaps the correction is INTERPOLATED between the two valid
+    % endpoints: freezing it at the last known value would let the error
+    % accumulate again.
     vi = find(validFloor);
     if isempty(vi)
-        error(['Nessun pavimento trovato in nessun keyframe: impossibile ' ...
-            'riallineare. Disattivare useGravityAlign o rivedere floorBand.']);
+        error(['No floor found in any keyframe: cannot realign. ' ...
+            'Disable useGravityAlign or review floorBand.']);
     end
     for k = 1:nKF
         if validFloor(k), continue; end
@@ -413,8 +414,9 @@ if useGravityAlign
         Rc{k} = quat2rotm(qC(k,:)) * kfPoses(k).R;
     end
 
-    % Re-integrazione delle posizioni: lo spostamento in frame body viene
-    % dall'odometria, la direzione in cui applicarlo dall'assetto corretto.
+    % Re-integration of positions: the displacement in the body frame comes
+    % from the odometry, the direction in which to apply it from the
+    % corrected attitude.
     pOld = vertcat(kfPoses.Translation);
     pNew = zeros(nKF,3);
     pNew(1,:) = pOld(1,:);
@@ -427,9 +429,9 @@ if useGravityAlign
         kfPoses(k) = rigidtform3d(Rc{k}, pNew(k,:));
     end
 
-    % Tilt residuo: e' la verifica che la correzione abbia fatto il suo
-    % lavoro. Se non scende vicino a zero, il pavimento non e' un buon
-    % riferimento in questo ambiente (rampe, terreno irregolare).
+    % Residual tilt: this is the check that the correction did its job. If
+    % it does not drop close to zero, the floor is not a good reference in
+    % this environment (ramps, uneven terrain).
     tiltAfter = nan(nKF,1);
     for k = 1:nKF
         if ~validFloor(k), continue; end
@@ -438,30 +440,30 @@ if useGravityAlign
         tiltAfter(k) = rad2deg(acos(max(-1, min(1, nMap(3)))));
     end
 
-    fprintf('  inclinazione pavimento: mediana %.2f -> %.2f deg, max %.2f -> %.2f deg\n', ...
+    fprintf('  floor tilt: median %.2f -> %.2f deg, max %.2f -> %.2f deg\n', ...
         median(tiltBefore(~isnan(tiltBefore))), median(tiltAfter(~isnan(tiltAfter))), ...
         max(tiltBefore), max(tiltAfter));
-    fprintf('  deriva Z traiettoria: %.2f m -> %.2f m\n', ...
+    fprintf('  trajectory Z drift: %.2f m -> %.2f m\n', ...
         max(pOld(:,3))-min(pOld(:,3)), max(pNew(:,3))-min(pNew(:,3)));
 end
 
-%% 6c. Correzione della deriva di YAW sulla direzione dei muri
-% Il pavimento vincola solo 2 DOF su 3: la normale di un piano orizzontale
-% e' invariante per rotazione attorno alla verticale, quindi dice dove e'
-% "su" ma non dove e' "nord". Lo yaw resta libero di derivare, e il sintomo
-% e' che i corridoi non si incontrano piu' ad angolo retto in pianta.
+%% 6c. YAW drift correction on the wall direction
+% The floor constrains only 2 of 3 DOF: the normal of a horizontal plane is
+% invariant to rotation about the vertical axis, so it tells "up" but not
+% "north". Yaw remains free to drift, and the symptom is that corridors no
+% longer meet at right angles in plan.
 %
-% Riferimento per lo yaw sono i MURI: si prendono le normali quasi
-% orizzontali e se ne calcola l'azimut dominante, ripiegato modulo 90 gradi
-% (cosi' i quattro lati di un corridoio ortogonale cadono sullo stesso
-% valore). La correzione riporta quell'azimut al valore di riferimento.
+% The reference for yaw is the WALLS: the near-horizontal normals are taken
+% and their dominant azimuth is computed, folded modulo 90 degrees (so the
+% four sides of an orthogonal corridor fall on the same value). The
+% correction brings that azimuth back to the reference value.
 %
-% ATTENZIONE, questa NON e' una misura pura come il pavimento: assume che
-% l'edificio abbia una direzione dominante coerente. Verificare sempre le
-% due stampe di controllo: se la dispersione NON cala nettamente, i muri
-% non appartengono a una sola famiglia ortogonale e va disattivata.
+% WARNING, this is NOT a pure measurement like the floor: it assumes the
+% building has a coherent dominant direction. Always check the two control
+% prints: if the dispersion does NOT drop clearly, the walls do not belong
+% to a single orthogonal family and it must be disabled.
 if useYawAlign
-    fprintf('Correzione deriva di yaw sui muri...\n');
+    fprintf('Correcting yaw drift on the walls...\n');
 
     azi = nan(nKF,1);
     for k = 1:nKF
@@ -473,31 +475,31 @@ if useYawAlign
             continue
         end
         nMap   = (kfPoses(k).R * nrm')';
-        isWall = abs(nMap(:,3)) < wallMaxNz;     % normale orizzontale => muro
+        isWall = abs(nMap(:,3)) < wallMaxNz;     % horizontal normal => wall
         if nnz(isWall) < 50, continue; end
         a = atan2(nMap(isWall,2), nMap(isWall,1));
-        % x4 porta il periodo da 90 a 360 gradi: cosi' la media circolare e'
-        % ben definita e non soffre del salto 0/90.
+        % x4 brings the period from 90 to 360 degrees: this way the circular
+        % mean is well defined and does not suffer from the 0/90 wrap.
         azi(k) = mod(rad2deg(angle(mean(exp(1i*4*a))))/4, 90);
     end
     validWall = ~isnan(azi);
-    fprintf('  azimut stimato su %d keyframe su %d\n', nnz(validWall), nKF);
+    fprintf('  azimuth estimated on %d out of %d keyframes\n', nnz(validWall), nKF);
 
     if nnz(validWall) < 10
-        warning(['Troppi pochi keyframe con muri: correzione yaw saltata. ' ...
-            'Ambiente probabilmente aperto o poco strutturato.']);
+        warning(['Too few keyframes with walls: yaw correction skipped. ' ...
+            'Environment is probably open or poorly structured.']);
     else
         z = nan(nKF,1) + 1i*nan;
         z(validWall) = exp(1i*4*deg2rad(azi(validWall)));
 
-        % Riferimento: media circolare dei primi keyframe, prima che la
-        % deriva si manifesti. Ancorare all'inizio conserva l'orientamento
-        % originale della mappa.
+        % Reference: circular mean of the first keyframes, before drift
+        % manifests. Anchoring to the start preserves the original
+        % orientation of the map.
         nRef = min(yawRefKF, nKF);
         zRef = mean(z(1:nRef), 'omitnan');
 
-        % Lisciatura circolare: la stima per singolo keyframe e' rumorosa e
-        % non va inseguita, la deriva e' un fenomeno lento.
+        % Circular smoothing: the per-keyframe estimate is noisy and should
+        % not be chased, drift is a slow phenomenon.
         zS = nan(nKF,1) + 1i*nan;
         hw = floor(yawSmooth/2);
         for k = 1:nKF
@@ -515,7 +517,7 @@ if useYawAlign
         dYaw = zeros(nKF,1);
         for k = 1:nKF
             d = rad2deg(angle(zS(k) / zRef)) / 4;
-            dYaw(k) = mod(d + 45, 90) - 45;     % riporta in [-45, 45]
+            dYaw(k) = mod(d + 45, 90) - 45;     % wrap into [-45, 45]
         end
 
         pOldY = vertcat(kfPoses.Translation);
@@ -537,7 +539,7 @@ if useYawAlign
             kfPoses(k) = rigidtform3d(RcY{k}, pNewY(k,:));
         end
 
-        % Controllo: la dispersione circolare deve calare nettamente.
+        % Check: the circular dispersion must drop clearly.
         aziAfter = nan(nKF,1);
         for k = 1:nKF
             pc = kfClouds{k};
@@ -555,28 +557,28 @@ if useYawAlign
         end
         cdisp = @(v) 1 - abs(mean(exp(1i*4*deg2rad(v(~isnan(v))))));
 
-        fprintf('  correzione applicata: da %.2f a %.2f deg\n', min(dYaw), max(dYaw));
-        fprintf('  dispersione direzione muri: %.3f -> %.3f  (piu'' basso = piu'' coerente)\n', ...
+        fprintf('  correction applied: from %.2f to %.2f deg\n', min(dYaw), max(dYaw));
+        fprintf('  wall direction dispersion: %.3f -> %.3f  (lower = more coherent)\n', ...
             cdisp(azi), cdisp(aziAfter));
     end
 end
 
-%% 6d. Correzione diretta della quota Z dal pavimento
-% floorDist (Sezione 6b) e' una misura locale, non affetta dalla deriva
-% Z accumulata: qui si applica direttamente a kfPoses. Il vincolo nel pose
-% graph (Sezione 7) resta comunque utile per difendere questa quota durante
-% l'ottimizzazione.
+%% 6d. Direct correction of Z height from the floor
+% floorDist (Section 6b) is a local measurement, unaffected by accumulated Z
+% drift: here it is applied directly to kfPoses. The constraint in the pose
+% graph (Section 7) is still useful to defend this height during
+% optimization.
 %
-% Nota: dopo il livellamento di roll/pitch (6b), le rotazioni di 6c sono
-% pura rotazione attorno a Z (yaw): non mescolano la componente Z della
-% traslazione, quindi applicare questa correzione qui (dopo 6c) invece che
-% prima da' lo stesso risultato numerico.
+% Note: after leveling roll/pitch (6b), the rotations in 6c are pure
+% rotation about Z (yaw): they do not mix the Z component of translation,
+% so applying this correction here (after 6c) instead of before gives the
+% same numerical result.
 floorFitRate = nnz(validFloor) / nKF;
 useGravityZ  = useGravityAlign && floorFitRate >= floorFitMin && validFloor(1);
 if useGravityZ
     pZ = vertcat(kfPoses.Translation);
     floorWorldZPre = pZ(:,3) - floorDist;
-    fprintf('\nQuota pavimento (pre-correzione): mediana %.3f m, std %.3f m (su %d/%d keyframe)\n', ...
+    fprintf('\nFloor height (pre-correction): median %.3f m, std %.3f m (on %d/%d keyframes)\n', ...
         median(floorWorldZPre(validFloor)), std(floorWorldZPre(validFloor)), nnz(validFloor), nKF);
 
     z1 = kfPoses(1).Translation(3);
@@ -589,84 +591,83 @@ if useGravityZ
 
     pZ = vertcat(kfPoses.Translation);
     floorWorldZPost = pZ(:,3) - floorDist;
-    fprintf('Quota pavimento (post-correzione): mediana %.3f m, std %.3f m (su %d/%d keyframe)\n', ...
+    fprintf('Floor height (post-correction): median %.3f m, std %.3f m (on %d/%d keyframes)\n', ...
         median(floorWorldZPost(validFloor)), std(floorWorldZPost(validFloor)), nnz(validFloor), nKF);
-    fprintf('Correzione Z diretta applicata a %d/%d keyframe (peso %.0f%% rilevamento pavimento)\n', ...
+    fprintf('Direct Z correction applied to %d/%d keyframes (%.0f%% floor detection weight)\n', ...
         nnz(validFloor), nKF, 100*floorFitRate);
 else
-    fprintf(['\nPavimento rilevato in %.0f%% dei keyframe (< %.0f%% richiesto) o nodo 1 senza fit: ' ...
-        'nessuna correzione Z diretta\n'], 100*floorFitRate, 100*floorFitMin);
+    fprintf(['\nFloor detected in %.0f%% of keyframes (< %.0f%% required) or node 1 has no fit: ' ...
+        'no direct Z correction\n'], 100*floorFitRate, 100*floorFitMin);
 end
 
-% Checkpoint: la lettura bag e l'estrazione keyframe sono costose e non
-% dipendono dai pesi del pose graph. Si salva qui per poter iterare senza
-% rifare tutto da capo.
+% Checkpoint: bag reading and keyframe extraction are expensive and do not
+% depend on the pose graph weights. Saved here so iterating does not require
+% redoing everything from scratch.
 checkpointFile = fullfile(fileparts(bagPath), 'noloop_checkpoint.mat');
 save(checkpointFile, 'kfPoses', 'nKF', 'kfVoxel', 'mapVoxel', 'kfClouds', ...
     'pairCloudIdx', 'pairOdomIdx', 'kfSel', '-v7.3');
-fprintf('Checkpoint salvato in: %s\n', checkpointFile);
+fprintf('Checkpoint saved to: %s\n', checkpointFile);
 
-%% 7. Costruzione del pose graph (solo odometria + gravita', NESSUN loop)
+%% 7. Building the pose graph (odometry + gravity only, NO loop)
 pg = poseGraph3D;
 
-% Information matrix: 21 elementi, triangolo superiore di una 6x6.
-% Diagonale = [x y z rx ry rz], valori piu' alti = vincolo piu' rigido.
+% Information matrix: 21 elements, upper triangle of a 6x6.
+% Diagonal = [x y z rx ry rz], higher values = stiffer constraint.
 infoVecOdom = buildInfoVector(infoOdom);
 
-% Vincoli sequenziali dall'odometria
+% Sequential constraints from odometry
 for k = 2:nKF
     Trel = kfPoses(k-1).A \ kfPoses(k).A;
     addRelativePose(pg, tform2measurement(Trel), infoVecOdom, k-1, k);
 end
 
-% Vincoli di gravita': senza questi, l'ottimizzazione della sola catena
-% odometrica potrebbe comunque discostare l'assetto dal riallineamento
-% fatto in 6b/6d.
+% Gravity constraints: without these, optimizing the odometry chain alone
+% could still move the attitude away from the realignment done in 6b/6d.
 if useGravityAlign && useGravityFactor
     if useGravityZ
-        fprintf('Vincolo Z nel pose graph attivato (peso %g)\n', infoGravZ);
+        fprintf('Z constraint in the pose graph enabled (weight %g)\n', infoGravZ);
     else
-        fprintf('Nessun vincolo Z nel pose graph (vedi Sezione 6d)\n');
+        fprintf('No Z constraint in the pose graph (see Section 6d)\n');
     end
 
     T0inv = kfPoses(1).A \ eye(4);
     nZCorr = 0;
     for k = 2:nKF
-        Ak = T0inv * kfPoses(k).A;    % posa di k relativa al nodo 1, gia' livellata
+        Ak = T0inv * kfPoses(k).A;    % pose of k relative to node 1, already leveled
         wZ = infoGravFree;
         if useGravityZ && validFloor(k)
-            Ak(3,4) = floorDist(k) - floorDist(1);   % target Z dal pavimento, non da poseZ (niente deriva)
+            Ak(3,4) = floorDist(k) - floorDist(1);   % target Z from the floor, not from poseZ (no drift)
             wZ = infoGravZ;
             nZCorr = nZCorr + 1;
         end
         addRelativePose(pg, tform2measurement(Ak), ...
             buildInfoVectorAniso(infoGravFree, infoGravRP, wZ), 1, k);
     end
-    fprintf('Vincoli di gravita aggiunti: %d (peso roll/pitch %g, Z da pavimento su %d/%d)\n', ...
+    fprintf('Gravity constraints added: %d (roll/pitch weight %g, Z from floor on %d/%d)\n', ...
         nKF-1, infoGravRP, nZCorr, nKF-1);
 end
 
-fprintf('\nPose graph: %d nodi, %d vincoli (nessun loop)\n', pg.NumNodes, pg.NumEdges);
+fprintf('\nPose graph: %d nodes, %d constraints (no loop)\n', pg.NumNodes, pg.NumEdges);
 
-%% 8. Ottimizzazione
-fprintf('Ottimizzazione...\n');
+%% 8. Optimization
+fprintf('Optimizing...\n');
 pgOpt = optimizePoseGraph(pg, 'builtin-trust-region');
 
-%% 9. Ricostruzione mappa con pose corrette
-% IMPORTANTE: poseGraph3D ancora SEMPRE il nodo 1 all'origine con
-% orientamento identita', mentre kfPoses(1) ha posizione e assetto propri.
-% Senza riportare il risultato nel frame di partenza, "prima" e "dopo"
-% vivono in due frame globali diversi, ruotati tra loro.
+%% 9. Map reconstruction with corrected poses
+% IMPORTANT: poseGraph3D ALWAYS anchors node 1 at the origin with identity
+% orientation, while kfPoses(1) has its own position and attitude. Without
+% bringing the result back to the starting frame, "before" and "after" live
+% in two different global frames, rotated relative to each other.
 nodesOpt = nodeEstimates(pgOpt);
 
-T0 = kfPoses(1).A;               % frame del primo keyframe
+T0 = kfPoses(1).A;               % frame of the first keyframe
 posesOpt = repmat(rigidtform3d, nKF, 1);
 for k = 1:nKF
-    n  = nodesOpt(k, :);         % nodeEstimates restituisce [x y z qw qx qy qz]
+    n  = nodesOpt(k, :);         % nodeEstimates returns [x y z qw qx qy qz]
     Ak = eye(4);
     Ak(1:3,1:3) = quat2rotm(n(4:7));
     Ak(1:3,4)   = n(1:3)';
-    Ak = T0 * Ak;                % riporto nel frame di partenza
+    Ak = T0 * Ak;                % bring back to the starting frame
     posesOpt(k) = rigidtform3d(Ak(1:3,1:3), Ak(1:3,4)');
 end
 nodesOpt = [vertcat(posesOpt.Translation), ...
@@ -681,10 +682,10 @@ end
 pcOpt = pointCloud(vertcat(allXYZ{:}));
 pcOpt = pcdownsample(pcOpt, 'gridAverage', mapVoxel);
 
-% Mappa originale: odometria GREZZA, senza NESSUN vincolo (ne' gravita', ne'
-% yaw, ne' Z, ne' pose graph) - vedi kfPosesOdomRaw in Sezione 6. E' il vero
-% "PRIMA": il confronto con pcOpt mostra l'effetto di TUTTE le correzioni
-% insieme, non solo del pose graph.
+% Original map: RAW odometry, with NO constraint at all (neither gravity,
+% nor yaw, nor Z, nor pose graph) - see kfPosesOdomRaw in Section 6. This is
+% the true "BEFORE": the comparison with pcOpt shows the effect of ALL
+% corrections together, not just of the pose graph.
 allXYZraw = cell(nKF, 1);
 for k = 1:nKF
     pcT = pctransform(kfClouds{k}, kfPosesOdomRaw(k));
@@ -693,27 +694,27 @@ end
 pcRaw = pointCloud(vertcat(allXYZraw{:}));
 pcRaw = pcdownsample(pcRaw, 'gridAverage', mapVoxel);
 
-% Filtro outlier sulla mappa finale (Sezione 1): qui compaiono anche
-% outlier "di giunzione" tra scansioni diverse che non esistono nel singolo
-% keyframe. Applicato a entrambe le mappe, per un confronto coerente.
+% Outlier filter on the final map (Section 1): here "seam" outliers between
+% different scans also appear, which do not exist in the single keyframe.
+% Applied to both maps, for a consistent comparison.
 if useOutlierFilterMap
     nOptBefore = pcOpt.Count;
     nRawBefore = pcRaw.Count;
     pcOpt = pcdenoise(pcOpt, 'NumNeighbors', outlierMapNumNeighbors, 'Threshold', outlierMapStdFactor);
     pcRaw = pcdenoise(pcRaw, 'NumNeighbors', outlierMapNumNeighbors, 'Threshold', outlierMapStdFactor);
-    fprintf('\nFiltro outlier sulla mappa:\n');
-    fprintf('  mappa corretta: %d -> %d punti (%.1f%% rimosso)\n', ...
+    fprintf('\nOutlier filter on the map:\n');
+    fprintf('  corrected map: %d -> %d points (%.1f%% removed)\n', ...
         nOptBefore, pcOpt.Count, 100*(nOptBefore - pcOpt.Count)/nOptBefore);
-    fprintf('  mappa grezza:   %d -> %d punti (%.1f%% rimosso)\n', ...
+    fprintf('  raw map:       %d -> %d points (%.1f%% removed)\n', ...
         nRawBefore, pcRaw.Count, 100*(nRawBefore - pcRaw.Count)/nRawBefore);
 end
 
-%% 9b. Crop geometrico (ROI) sulla mappa finale
-% ATTENZIONE al punto in cui si applica. Il ROI va QUI, sulla mappa gia'
-% ricostruita, non sulle nuvole keyframe: quelle sono in frame body e
-% servono al fit del pavimento/muri. Ritagliarle degraderebbe il
-% riallineamento.
-fprintf('\n--- Estensione della mappa (per scegliere il ROI) ---\n');
+%% 9b. Geometric crop (ROI) on the final map
+% WATCH the point at which this is applied. The ROI goes HERE, on the
+% already reconstructed map, not on the keyframe clouds: those are in the
+% body frame and are used for the floor/wall fit. Cropping them would
+% degrade the realignment.
+fprintf('\n--- Map extent (to choose the ROI) ---\n');
 fprintf('  X: %7.2f  %7.2f\n', pcOpt.XLimits);
 fprintf('  Y: %7.2f  %7.2f\n', pcOpt.YLimits);
 fprintf('  Z: %7.2f  %7.2f\n', pcOpt.ZLimits);
@@ -722,28 +723,28 @@ if useMapROI
     nBeforeOpt = pcOpt.Count;
     nBeforeRaw = pcRaw.Count;
 
-    % Il crop si applica a ENTRAMBE le mappe: confrontare una zona ritagliata
-    % con la mappa intera renderebbe il confronto prima/dopo privo di senso.
+    % The crop is applied to BOTH maps: comparing a cropped area with the
+    % whole map would make the before/after comparison meaningless.
     pcOpt = select(pcOpt, findPointsInROI(pcOpt, mapROI));
     pcRaw = select(pcRaw, findPointsInROI(pcRaw, mapROI));
 
-    fprintf('ROI applicato [%g %g, %g %g, %g %g]\n', mapROI);
-    fprintf('  mappa corretta: %d -> %d punti (%.1f%% rimosso)\n', ...
+    fprintf('ROI applied [%g %g, %g %g, %g %g]\n', mapROI);
+    fprintf('  corrected map: %d -> %d points (%.1f%% removed)\n', ...
         nBeforeOpt, pcOpt.Count, 100*(nBeforeOpt - pcOpt.Count)/nBeforeOpt);
-    fprintf('  mappa grezza:   %d -> %d punti (%.1f%% rimosso)\n', ...
+    fprintf('  raw map:       %d -> %d points (%.1f%% removed)\n', ...
         nBeforeRaw, pcRaw.Count, 100*(nBeforeRaw - pcRaw.Count)/nBeforeRaw);
 
     if pcOpt.Count == 0 || pcRaw.Count == 0
-        error(['Il ROI ha svuotato la mappa: nessun punto dentro i limiti. ' ...
-            'Controllare che le coordinate siano nel frame mappa stampato sopra.']);
+        error(['The ROI emptied the map: no points inside the limits. ' ...
+            'Check that the coordinates are in the map frame printed above.']);
     end
 end
 
-%% 10. Confronto
-% ATTENZIONE alla metrica. L'escursione Z della MAPPA non misura la deriva:
-% ogni singola scansione copre gia' diversi metri in verticale, quindi il
-% bounding box resta ampio anche con una traiettoria perfetta. La deriva
-% vive nelle POSE, ed e' li' che va misurata.
+%% 10. Comparison
+% WATCH the metric. The Z extent of the MAP does not measure drift: each
+% single scan already covers several meters vertically, so the bounding box
+% stays large even with a perfect trajectory. Drift lives in the POSES, and
+% that is where it must be measured.
 zTrajRaw = vertcat(kfPosesOdomRaw.Translation);
 zTrajRaw = zTrajRaw(:,3);
 zTrajOpt = nodesOpt(:,3);
@@ -751,50 +752,48 @@ zTrajOpt = nodesOpt(:,3);
 spanTrajRaw = max(zTrajRaw) - min(zTrajRaw);
 spanTrajOpt = max(zTrajOpt) - min(zTrajOpt);
 
-fprintf('\n--- Deriva verticale della TRAIETTORIA (metrica corretta) ---\n');
-fprintf('Prima:  escursione Z pose %.2f m\n', spanTrajRaw);
-fprintf('Dopo:   escursione Z pose %.2f m  (%+.1f%%)\n', ...
+fprintf('\n--- Vertical drift of the TRAJECTORY (correct metric) ---\n');
+fprintf('Before: pose Z extent %.2f m\n', spanTrajRaw);
+fprintf('After:  pose Z extent %.2f m  (%+.1f%%)\n', ...
     spanTrajOpt, 100*(spanTrajOpt - spanTrajRaw)/spanTrajRaw);
-fprintf('Spostamento medio dei nodi (da odometria grezza a tutte le correzioni): %.3f m\n', ...
+fprintf('Mean node displacement (from raw odometry to all corrections): %.3f m\n', ...
     mean(vecnorm(nodesOpt(:,1:3) - vertcat(kfPosesOdomRaw.Translation), 2, 2)));
 
-% Escursione Z della mappa, riportata solo come riferimento: NON e' un
-% indicatore di deriva, vedi commento sopra.
-fprintf('\n--- Estensione Z della mappa (NON indicatore di deriva) ---\n');
-fprintf('Prima:  %7.2f  %7.2f   (escursione %.2f m)\n', ...
+% Z extent of the map, reported only as a reference: NOT a drift indicator,
+% see comment above.
+fprintf('\n--- Map Z extent (NOT a drift indicator) ---\n');
+fprintf('Before: %7.2f  %7.2f   (extent %.2f m)\n', ...
     pcRaw.ZLimits, diff(pcRaw.ZLimits));
-fprintf('Dopo:   %7.2f  %7.2f   (escursione %.2f m)\n', ...
+fprintf('After:  %7.2f  %7.2f   (extent %.2f m)\n', ...
     pcOpt.ZLimits, diff(pcOpt.ZLimits));
 
-figure('Color', 'k', 'Name', 'Confronto odometria grezza / tutte le correzioni');
-
-subplot(2,1,1);
+figure('Color', 'k', 'Name', 'Raw odometry / all corrections comparison - BEFORE');
 pcshow(pcRaw, 'MarkerSize', 20);
-title(sprintf('PRIMA (odometria grezza, nessun vincolo), escursione Z %.2f m', diff(pcRaw.ZLimits)), 'Color', 'w');
+title(sprintf('BEFORE (raw odometry, no constraint), Z extent %.2f m', diff(pcRaw.ZLimits)), 'Color', 'w');
 xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
 axis equal; colormap(gca, turbo);
 
-subplot(2,1,2);
+figure('Color', 'k', 'Name', 'Raw odometry / all corrections comparison - AFTER');
 pcshow(pcOpt, 'MarkerSize', 20);
-title(sprintf('DOPO (gravita'' + yaw + Z + pose graph), escursione Z %.2f m', diff(pcOpt.ZLimits)), 'Color', 'w');
+title(sprintf('AFTER (gravity + yaw + Z + pose graph), Z extent %.2f m', diff(pcOpt.ZLimits)), 'Color', 'w');
 xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
 axis equal; colormap(gca, turbo);
 
-% Traiettoria prima (odometria grezza) e dopo (tutte le correzioni)
-figure('Name', 'Traiettoria');
+% Trajectory before (raw odometry) and after (all corrections)
+figure('Name', 'Trajectory');
 trajRaw = vertcat(kfPosesOdomRaw.Translation);
 plot3(trajRaw(:,1), trajRaw(:,2), trajRaw(:,3), 'r-', 'LineWidth', 1.5);
 hold on;
 plot3(nodesOpt(:,1), nodesOpt(:,2), nodesOpt(:,3), 'g-', 'LineWidth', 1.5);
-legend('Prima', 'Dopo', 'Location', 'best');
+legend('Before', 'After', 'Location', 'best');
 xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
-title('Traiettoria keyframe');
+title('Keyframe trajectory');
 axis equal; grid on;
 
-%% 11. Salvataggio
-% Vedi useSaveCorrectedMap / savedBagDir in Sezione 1. Nome file = timestamp
-% del salvataggio (YY-MM-DD - HH-MM-SS), cosi' run diversi non si
-% sovrascrivono a vicenda.
+%% 11. Saving
+% See useSaveCorrectedMap / savedBagDir in Section 1. File name = save
+% timestamp (YY-MM-DD - HH-MM-SS), so different runs do not overwrite each
+% other.
 if useSaveCorrectedMap
     if ~exist(savedBagDir, 'dir')
         mkdir(savedBagDir);
@@ -802,18 +801,18 @@ if useSaveCorrectedMap
     stamp = char(datetime('now', 'Format', 'yy-MM-dd - HH-mm-ss'));
     correctedMapOutFile = fullfile(savedBagDir, [stamp '.pcd']);
     pcwrite(pcOpt, correctedMapOutFile, 'Encoding', 'binary');
-    fprintf('\nMappa corretta salvata in:\n  %s\n', correctedMapOutFile);
+    fprintf('\nCorrected map saved to:\n  %s\n', correctedMapOutFile);
 else
-    fprintf('\nSalvataggio mappa disattivato (useSaveCorrectedMap = false)\n');
+    fprintf('\nMap saving disabled (useSaveCorrectedMap = false)\n');
 end
 
-%% Funzioni di supporto
+%% Support functions
 function v = buildInfoVectorAniso(wFree, wRP, wZ)
-    % Information matrix anisotropa: peso su roll e pitch, quasi nullo sul
-    % resto. L'ordine della diagonale e' [x y z rx ry rz]. wFree deve essere
-    % > 0: addRelativePose rifiuta matrici non definite positive. wZ
-    % opzionale (default wFree): peso su Z quando il vincolo di quota
-    % e' attivo per il keyframe corrente.
+    % Anisotropic information matrix: weight on roll and pitch, near-zero on
+    % the rest. The diagonal order is [x y z rx ry rz]. wFree must be > 0:
+    % addRelativePose rejects non positive-definite matrices. wZ optional
+    % (default wFree): weight on Z when the height constraint is active for
+    % the current keyframe.
     if nargin < 3, wZ = wFree; end
     M = diag([wFree wFree wZ wRP wRP wFree]);
     v = zeros(1, 21);
@@ -827,11 +826,11 @@ function v = buildInfoVectorAniso(wFree, wRP, wZ)
 end
 
 function v = buildInfoVector(w)
-    % Information matrix 6x6 diagonale, restituita come i 21 elementi del
-    % triangolo superiore nell'ordine richiesto da addRelativePose.
-    % L'ordine e' per righe: (1,1)...(1,6),(2,2)...(2,6),...,(6,6).
-    % La maschera triu con indicizzazione lineare di MATLAB e' per colonne,
-    % quindi metterebbe la diagonale nelle posizioni sbagliate.
+    % Diagonal 6x6 information matrix, returned as the 21 elements of the
+    % upper triangle in the order required by addRelativePose.
+    % The order is row-major: (1,1)...(1,6),(2,2)...(2,6),...,(6,6).
+    % MATLAB's triu with linear indexing is column-major, so it would put
+    % the diagonal in the wrong positions.
     M = diag([w w w w w w]);
     v = zeros(1, 21);
     n = 0;
@@ -844,7 +843,7 @@ function v = buildInfoVector(w)
 end
 
 function meas = tform2measurement(A)
-    % Da matrice omogenea 4x4 a [x y z qw qx qy qz]
+    % From a 4x4 homogeneous matrix to [x y z qw qx qy qz]
     R = A(1:3, 1:3);
     t = A(1:3, 4)';
     q = rotm2quat(R);
@@ -852,18 +851,19 @@ function meas = tform2measurement(A)
 end
 
 function q = slerpQuat(q0, q1, t)
-    % Interpolazione sferica tra due quaternioni. Scritta a mano perche'
-    % quatinterp richiede l'Aerospace Toolbox, non tra i requisiti.
+    % Spherical interpolation between two quaternions. Written by hand
+    % because quatinterp requires the Aerospace Toolbox, which is not among
+    % the requirements.
     q0 = q0 / norm(q0);
     q1 = q1 / norm(q1);
 
     c = dot(q0, q1);
-    if c < 0            % percorso piu' corto sulla sfera
+    if c < 0            % shortest path on the sphere
         q1 = -q1;
         c  = -c;
     end
 
-    if c > 0.9995       % quasi allineati: lineare, evita la divisione instabile
+    if c > 0.9995       % nearly aligned: linear, avoids the unstable division
         q = q0 + t*(q1 - q0);
         q = q / norm(q);
         return
