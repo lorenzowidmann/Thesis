@@ -1,0 +1,15 @@
+# Stage 1 -- classify_openings.py. Same set EmissivityCalculation needs, minus
+# pandas (openings/table.py uses stdlib csv). Run with C:\venvs\emissivity.
+torch
+transformers
+opencv-python
+numpy
+pillow
+scikit-image        # SAM gap-fill uses scipy.ndimage via skimage; SLIC for --segmenter slic
+
+# Stage 2 -- opening_voxel_consensus.py. Reads the LiDAR bag and
+# rig_calibration.yaml, needs no CLIP. Run with C:\venvs\sensorfusion.
+# Listed separately on purpose: same split as project_to_flir.py.
+#   rosbags
+#   pyyaml
+#   numpy
