@@ -21,7 +21,7 @@ close all
 clc
 
 %% 1. Parameters
-bagPath = "C:\Users\loren\Desktop\Dati_vfinal\SLAM\Lidar\rosbag2_2026_07_30-17_50_45\rosbag2_2026_07_30-17_50_45_0.db3";
+bagPath = "C:\Users\loren\Desktop\Dati_vfinal\SLAM\Lidar\rosbag2_2026_07_30-18_12_20\rosbag2_2026_07_30-18_12_20_0.db3";
 
 % Keyframe selection: a new keyframe when the sensor has moved by
 % kfDistance meters OR rotated by kfAngle degrees relative to the previous one.
@@ -36,7 +36,7 @@ kfAngle    = 15;     % degrees
 % unpredictably (turns, local back-and-forth), elapsed time cannot. Tune by
 % looking at "Usable odometry duration" (Section 3b) and the "Trajectory"
 % plot of a previous run with useTimeCut = false.
-useTimeCut      = true;
+useTimeCut      = false;
 timeCutStartSec = 10;   % s, discard keyframes with elapsed time < this (NaN = from the start)
 timeCutEndSec   = 180;   % s, discard keyframes with elapsed time > this (NaN = to the end)
 
@@ -200,7 +200,7 @@ topoWMixed    = 1.0;
 topoWLineLine = 0.7;
 
 % Voxel size for the final map
-mapVoxel = 0.05;    % m
+mapVoxel = 0.01;    % m
 
 % Geometric crop (ROI) of the final map, applied in section 11b.
 % Coordinates in the map frame; use Inf/-Inf to leave an axis unbounded.
@@ -209,8 +209,8 @@ mapVoxel = 0.05;    % m
 % Examples: [-Inf Inf, -Inf Inf, -Inf 2.5] cuts only above 2.5 m
 %           [0 40, -5 15, -Inf Inf]        isolates a segment in plan
 useMapROI = true;
-mapROI = [16 Inf, ...     % X min max
-          -Inf Inf, ...     % Y min max
+mapROI = [-Inf 40, ...     % X min max
+          -1.8 2, ...     % Y min max
           -1 4];        % Z min max
 
 % Odometry divergence detection (IMU/FAST-LIO losing tracking).
@@ -224,7 +224,7 @@ odomMaxJump  = 5.0;    % m, maximum absolute jump tolerated regardless of dt
 % The file name is generated at save time (Section 13) as a
 % YY-MM-DD - HH-MM-SS timestamp, so different runs do not overwrite each other.
 useSaveCorrectedMap = true;
-savedBagDir = 'C:\Users\loren\Desktop\Measurment_v2\ClaudeCode\Thesis\MATLAB_LoopClosure\LoopClosure_vFinal\SavedBag';
+savedBagDir = 'C:\Users\loren\Desktop\Measurment_v2\ClaudeCode\Thesis-final-wt2\3DModelPointCloudExtraction\SavedBag';
 
 %% 2. Bag reading
 bag = ros2bagreader(bagPath);

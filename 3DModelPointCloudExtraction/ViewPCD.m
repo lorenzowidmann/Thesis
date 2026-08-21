@@ -15,12 +15,12 @@ close all
 clc
 
 %% 1. Parametri
-pcdPath = "C:\Users\loren\Desktop\Measurment_v2\ClaudeCode\Thesis\MATLAB_LoopClosure\LoopClosure_vFinal\SavedBag\26-08-20 - 09-10-10.pcd";
+pcdPath =  "C:\Users\loren\Desktop\Measurment_v2\ClaudeCode\Thesis-final-wt2\3DModelPointCloudExtraction\SavedBag\merged_cloud.pcd";
 
 % Downsampling a voxel: media i punti dentro celle cubiche di lato
 % voxelSize. Riduce la densita' in modo uniforme nello spazio.
 useVoxelDownsample = false;
-voxelSize = 0.05;   % m
+voxelSize = 0.01;   % m
 
 % Downsampling casuale: tiene solo densityFraction dei punti (0-1],
 % scelti a caso. Utile per alleggerire una nuvola gia' uniforme senza

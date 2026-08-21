@@ -133,7 +133,7 @@ odomMaxJump  = 5.0;    % m, maximum absolute jump tolerated regardless of dt
 % The file name is generated at save time (Section 11) as a
 % YY-MM-DD - HH-MM-SS timestamp, so different runs do not overwrite each other.
 useSaveCorrectedMap = true;
-savedBagDir = 'C:\Users\loren\Desktop\Measurment_v2\ClaudeCode\Thesis\MATLAB_LoopClosure\LoopClosure_vFinal\SavedBag';
+savedBagDir = 'C:\Users\loren\Desktop\Measurment_v2\ClaudeCode\Thesis-final-wt2\3DModelPointCloudExtraction\SavedBag';
 
 %% 2. Bag reading
 bag = ros2bagreader(bagPath);

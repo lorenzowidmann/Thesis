@@ -39,10 +39,18 @@ Run in order:
    Boxes sharing a `hall` id become one Space/ThermalZone; touching or
    overlapping boxes are left open to each other (no wall inserted between
    them) regardless of room membership.
+6. `to_pcd.py` — exports a single merged `.pcd` from `boxes_merged.json`,
+   applying to each session's cloud the same translation its boxes were
+   dragged by in `merge_boxes.py` (which aligns the boxes but leaves the
+   clouds behind them unaligned). Keeps only the points the boxes contain by
+   default, `--all-points` to keep the whole aligned scan, `--voxel` to
+   collapse duplicates where two sessions share a source cloud. Also works on
+   a single-session `boxes.json`, where it simply crops to the boxes.
 
 ## Data (not tracked, see `.gitignore`)
 
-- `SavedBag/` — saved `.pcd` point clouds.
+- `SavedBag/` — saved `.pcd` point clouds, including `to_pcd.py`'s
+  `merged_cloud.pcd`.
 - `SavedBoxes/` — `boxes.json` / `boxes_edited.json` / `boxes_merged.json`.
 - `OpenStudioModel/` — exported `.osm` models.
 - `__pycache__/` — Python bytecode cache.

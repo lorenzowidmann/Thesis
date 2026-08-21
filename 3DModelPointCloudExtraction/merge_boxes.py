@@ -8,9 +8,21 @@ Unlike interactive_boxes.py, dragging here is translate-only: click any box from
 session and drag, and every box in that session shifts x_min/x_max/y_min/y_max by the
 same dx/dy (so each box's own footprint size never changes, and their relative layout
 within the session is preserved); z_min/z_max stay exactly as loaded, so a session can
-never be dragged off its own floor. There is no resize and no rotate. This is enforced
-by construction (the drag handler only ever adds the same dx/dy to both min and max of
-every box in the session, and never touches z), not by a size/height check after the fact.
+never be dragged off its own floor. There is no resize. This is enforced by construction
+(the drag handler only ever adds the same dx/dy to both min and max of every box in the
+session, and never touches z), not by a size/height check after the fact.
+
+The whole session can also be ROTATED, in 90 degree steps only ('r' = clockwise, 'R' =
+counter-clockwise, applied to whichever session the last-clicked box belongs to -- same
+box the 'd' delete uses). Every box in the session is rotated together about the
+session's own current bounding-box center, so the family turns in place rather than
+swinging around some other session's origin; each box's footprint stays axis-aligned
+(width/height simply swap on an odd number of 90s) and z is untouched, same as a drag.
+90-degree-only is a deliberate limit, not a missing feature: to_pcd.py has to recover
+each session's total rotation from the merged file alone (see its own docstring), and
+searching the 4 right angles for a match is exact and unambiguous -- an arbitrary angle
+would need the rotation to be written out separately, which is what this tool has always
+avoided (see "HOW THE PER-SESSION OFFSET IS RECOVERED" in to_pcd.py's docstring).
 
 Every box keeps its origin ("session" = index into the file list below, "source_file",
 "source_hall" = its hall id before merging, "source_id" = its id before renumbering) so
@@ -43,6 +55,9 @@ While the window is open:
     click + drag any box    move its WHOLE SESSION together (X/Y only -- size and Z are
                              locked, see above)
     click empty space + drag   normal camera orbit/pan/zoom (unchanged)
+    'r' key                 rotate the last-clicked box's WHOLE SESSION 90 deg clockwise
+                             about that session's own bounding-box center
+    'R' key (shift+r)       same, counter-clockwise
     'd' key (or Backspace)  delete the last INDIVIDUAL box you clicked (drag or plain
                              click), then it's excluded from the merge -- the rest of its
                              session is untouched
@@ -252,7 +267,11 @@ def main():
             [[s["xmin"], s["ymin"], s["z1"]]], [text], font_size=13, text_color=s["color"],
             shape_opacity=0.7, always_visible=True)
 
-    for bid in order:
+    def create_box_actor(bid):
+        # (Re)builds bid's mesh + actors from its current boxes_state -- used both for the
+        # initial draw and after a rotate, which (unlike a drag) changes the mesh's own
+        # bounds (width/height swap on an odd number of 90s) so the cheap SetPosition
+        # nudge move_box_actor uses does not apply; the actor has to be rebuilt instead.
         s = boxes_state[bid]
         mesh = pv.Box(bounds=(s["xmin"], s["xmax"], s["ymin"], s["ymax"], s["z0"], s["z1"]))
         meshes[bid] = mesh
@@ -265,6 +284,9 @@ def main():
         actor_to_box[solid_actor] = bid
         actor_offsets[bid] = [0.0, 0.0]
         refresh_label(bid)
+
+    for bid in order:
+        create_box_actor(bid)
 
     # Precomputed once: which box ids belong to each session, so a drag doesn't have to
     # scan every box in the merge on every single mouse-move event -- just its own session.
@@ -311,6 +333,45 @@ def main():
     # default.
     p.iren.style = style
 
+    def rotate_point_cw(x, y, cx, cy, clockwise):
+        # 90 deg rotation about (cx, cy): clockwise maps (0,1) (north) -> (1,0) (east), i.e.
+        # (dx, dy) -> (dy, -dx); counter-clockwise is the inverse, (dx, dy) -> (-dy, dx).
+        dx, dy = x - cx, y - cy
+        if clockwise:
+            return cx + dy, cy - dx
+        return cx - dy, cy + dx
+
+    def rotate_session(clockwise):
+        bid = style.last_id
+        if bid is None or bid not in boxes_state:
+            print("click a box first (drag or just click it), then 'r'/'R' to rotate its "
+                  "whole session 90 deg")
+            return
+        session = boxes_state[bid]["session"]
+        members = session_members.get(session, [])
+        if not members:
+            return
+        xs = [boxes_state[m]["xmin"] for m in members] + \
+             [boxes_state[m]["xmax"] for m in members]
+        ys = [boxes_state[m]["ymin"] for m in members] + \
+             [boxes_state[m]["ymax"] for m in members]
+        cx, cy = (min(xs) + max(xs)) / 2.0, (min(ys) + max(ys)) / 2.0
+        for m in members:
+            s = boxes_state[m]
+            x0, y0 = rotate_point_cw(s["xmin"], s["ymin"], cx, cy, clockwise)
+            x1, y1 = rotate_point_cw(s["xmax"], s["ymax"], cx, cy, clockwise)
+            s["xmin"], s["xmax"] = min(x0, x1), max(x0, x1)
+            s["ymin"], s["ymax"] = min(y0, y1), max(y0, y1)
+            acts = box_actors.pop(m)
+            p.remove_actor(acts["solid"])
+            p.remove_actor(acts["wire"])
+            del actor_to_box[acts["solid"]]
+            create_box_actor(m)
+        p.render()
+        direction = "clockwise" if clockwise else "counter-clockwise"
+        print(f"session {session}: rotated {len(members)} box(es) 90 deg {direction} "
+              f"about ({cx:.2f}, {cy:.2f})")
+
     def delete_last():
         bid = style.last_id
         if bid is None or bid not in boxes_state:
@@ -342,8 +403,11 @@ def main():
     p.add_key_event("d", delete_last)
     p.add_key_event("BackSpace", delete_last)
     p.add_key_event("p", print_all)
+    p.add_key_event("r", lambda: rotate_session(True))
+    p.add_key_event("R", lambda: rotate_session(False))
     p.add_text("click+drag any box to move its WHOLE SESSION together (X/Y only -- size "
-               "& floor locked) -- click empty space to orbit/pan/zoom as usual -- "
+               "& floor locked) -- 'r'/'R' rotate last-clicked box's session 90 deg "
+               "CW/CCW -- click empty space to orbit/pan/zoom as usual -- "
                "'d'/Backspace delete last-clicked box -- 'p' print -- close to save",
                font_size=9, color="black")
 
@@ -361,6 +425,7 @@ def main():
     p.camera.up = (0.0, 1.0, 0.0)
 
     print(f"{len(order)} box(es) from {len(args.sessions)} session(s) -- drag to align, "
+          f"'r'/'R' to rotate last-clicked box's session 90 deg CW/CCW, "
           f"'d'/Backspace to delete last-clicked, 'p' to print, close window to save")
     p.show()
 
