@@ -4,13 +4,15 @@ Self-contained (no cross-import from OpenStudioModel or OcTree -- the files
 it reuses are copied in, see "Provenance" below). Three-step pipeline:
 
 1. **`fit_closed_planes.py`** -- RANSAC-fits a single watertight box (floor,
-   ceiling, 4 walls) from the raw LiDAR point cloud. Writes `planes.json`.
+   ceiling, 4 walls) from the raw LiDAR point cloud. Writes
+   `OcTreeVoxel_out/planes.json`.
 2. **`aligned_octree.py`** -- derives a 3-axis "building frame" rotation from
    that closed box, applies it (+ a translation putting the floor at z=0) as
    a rigid transform to the *entire* raw cloud, then octree-voxelizes the
    now axis-aligned result. Writes `voxels.npz`, `transform.json`, and
-   `planes_aligned.json` (the closed box re-derived *in* the aligned frame).
-3. **`view_voxels.py`** -- pyvista viewer for `voxels.npz`: cubes colored by
+   `planes_aligned.json` (the closed box re-derived *in* the aligned frame),
+   all into `OcTreeVoxel_out/`.
+3. **`view_voxels.py`** -- pyvista viewer for `OcTreeVoxel_out/voxels.npz`: cubes colored by
    point count (no semantic classes here), with the closed box from
    `planes_aligned.json` overlaid as a sanity check (should meet the voxel
    walls at an exact 90 degrees), and an optional raw-points overlay.
@@ -33,11 +35,19 @@ No thermal/temperature averaging per voxel yet -- geometry/alignment only.
 
 ## Usage
 
-```
-C:\venvs\planefit\Scripts\python.exe fit_closed_planes.py --bag <rosbag2_folder> --out planes.json
-C:\venvs\planefit\Scripts\python.exe aligned_octree.py --planes planes.json --voxel-size 0.15
+```powershell
+C:\venvs\planefit\Scripts\python.exe fit_closed_planes.py --bag <rosbag2_folder>
+C:\venvs\planefit\Scripts\python.exe aligned_octree.py --voxel-size 0.15
 C:\venvs\planefit\Scripts\python.exe view_voxels.py
 ```
+
+Every generated file lands in `OcTreeVoxel_out\` next to the scripts (created
+if missing), and every script reads its inputs from there by default, so the
+three steps chain with no path flags. The whole folder is `.gitignore`d --
+these are build products of one specific bag + `--voxel-size`, not committed
+data. Override individually with `--out` (step 1),
+`--planes`/`--voxels-out`/`--transform-out`/`--planes-aligned-out` (step 2),
+`--voxels`/`--transform`/`--planes-aligned` (step 3).
 
 `--bag` defaults to the reference bag:
 `C:\Users\loren\Desktop\Dati_vfinal\SLAM\Lidar\rosbag2_2026_07_30-18_12_20\rosbag2_2026_07_30-18_12_20_filtered`
@@ -45,7 +55,7 @@ C:\venvs\planefit\Scripts\python.exe view_voxels.py
 x,y,z float32, frame_id=camera_init).
 
 `aligned_octree.py` re-reads the same bag itself (via the `bag`/`topic`/
-`store` fields recorded in `planes.json`, overridable) -- the planes are used
+`store` fields recorded in `OcTreeVoxel_out/planes.json`, overridable) -- the planes are used
 *only* to compute the alignment transform, every point in the bag is still
 loaded and transformed, none are clipped/dropped by plane membership.
 
@@ -71,6 +81,8 @@ Not bound to `+`/`-`/arrow keys: pyvista's own defaults already use those for
 camera zoom and point size, so reusing them would fire both at once.
 
 ## Output
+
+All of these go to `OcTreeVoxel_out/`.
 
 - `planes.json` -- `normal`, `d`,
   `orientation` (`wall` / `floor_ceiling`), `tilt_deg`, `centroid_3d`,

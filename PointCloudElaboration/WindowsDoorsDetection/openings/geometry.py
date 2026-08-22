@@ -8,16 +8,33 @@ distinction is not cosmetic -- the first QA pass on real session output showed
 that bbox-based reasoning invents relationships the masks do not have (see
 `door_edge_window_fraction` below).
 
-Pixel-space only, by design: no LiDAR, no depth, no metric threshold. Measured
-on session 9, LiDAR returns nothing off glazing -- 11 of 19 opening detections
-in the first three frames got ZERO points, including the largest and most
-confident window in the session (a 315x735 px glass wall at conf 0.98-0.99,
-zero points in all three frames). A metric gate here would fail hardest on
-exactly the class it is meant to validate. The metric height/width check
-therefore belongs downstream, on the consensus voxels, where multi-view
-accumulation and the floor-plane fit make it meaningful.
+WINDOWS are decided in pixel space only, and that is still deliberate. LiDAR
+returns nothing off glazing -- 11 of 19 opening detections in session 9's first
+three frames got ZERO points, including the largest and most confident window
+in the session (a 315x735 px glass wall at conf 0.98-0.99, zero points in all
+three frames). A metric gate on a window would fail hardest on exactly the
+class it is meant to validate, so the window rules below stay pixel-only and
+the metric window check stays downstream, on the consensus voxels.
 
-Every threshold below was measured on session 9's first three frames, not
+DOORS are different, and since the Mask2Former switch they are measured against
+the LiDAR before being discarded. A door leaf is opaque, sits at one depth, and
+gets hit. Meanwhile every pixel rule that kills a door candidate -- minimum
+width, "not taller than a glazed wall", minimum area -- is a depth-dependent
+threshold written as a constant, so the same door at 4 m and at 12 m differs
+threefold in pixels. `lidar_metrics.measure_region` supplies the scale, and
+`apply_geometry_filter` takes a `door_metric_fn`:
+
+  * metric says door-sized     -> RESCUES a candidate a size rule wanted to kill
+  * metric says not door-sized -> REJECTS one the size rules would have kept
+  * no measurement (too few returns, or a mask spanning several depths)
+    -> the pixel rules decide alone, unchanged
+
+Two rules are NOT rescuable, because they are not size questions: floor contact
+(`door_not_floor_standing`) and bay-edge adjacency
+(`door_window_edge_adjacent`). A metrically door-sized strip at the edge of a
+glazed bay is still a reveal, not a door.
+
+Every pixel threshold below was measured on session 9's first three frames, not
 guessed. Where a default is on thin evidence, the docstring says so.
 """
 
@@ -31,12 +48,16 @@ except ImportError:                     # imported as a bare module by path
 # --- defaults, all measured on session 9 frames 1-3 ------------------------
 DILATE_PX = 2
 # Mask-adjacency distance to the floor segment that still counts as standing
-# on the floor. NOT the frame bottom: SAM segments the floor as one large
+# on the floor. NOT the frame bottom: the floor is segmented as one large
 # region reaching y=H, so a door's bottom edge sits at the wall/floor junction
 # in mid-frame and zones.py's `y1 >= H-3` test never fires for an opening
 # (0 of 19 detections passed it). Measured door gaps: 1, 31, 40, 48, 101, 114
 # (standing on the floor) vs 370, 462 (genuinely floating). 120 splits them,
 # and absorbs skirting boards and the shadow band under a door.
+#
+# The floor region itself is now Mask2Former's ADE `floor` class rather than
+# zone_of()'s bbox guess (see segmentation_m2f.zone_from_ade), which makes this
+# test stronger than when it was measured: the mask is the actual floor.
 FLOOR_TOL_PX = 120
 # A floor-to-ceiling glazed wall, as a fraction of frame height, on the MERGED
 # region. Session 9's real glass wall measures 0.68 and is the largest opening
@@ -49,11 +70,21 @@ GLASS_WALL_H_RATIO = 0.60
 # work on a mask partition.
 DOOR_EDGE_WINDOW_FRAC = 0.40
 DOOR_EDGE_BAND_PX = 25
-# Sliver guard only. A pixel width is depth-dependent and therefore weak -- the
-# real width gate is the metric one at stage 2. Session 9 door candidates span
-# 34-136 px at 4.5-7.4 m.
+# Sliver guard only. A pixel width is depth-dependent and therefore weak, which
+# is precisely why door_metric_fn can now overrule it. Session 9 door
+# candidates span 34-136 px at 4.5-7.4 m.
 MIN_DOOR_WIDTH_PX = 40
-MIN_REGION_AREA_PX = 1500       # matches classify_openings.py's --sam-min-area
+MIN_REGION_AREA_PX = 1500       # matches classify_openings.py's --min-area
+
+# Rules a door-sized LiDAR measurement is allowed to overturn. All three are
+# thresholds on pixel extent, i.e. on distance as much as on the object; the
+# two rules absent from this set (floor contact, bay-edge adjacency) are
+# statements about where the region sits, which no metric measurement answers.
+RESCUABLE_DOOR_RULES = frozenset({
+    "door_below_min_area",
+    "door_below_min_width",
+    "door_taller_than_glass_wall",
+})
 
 
 def _structure(dilate_px: int) -> np.ndarray:
@@ -190,7 +221,9 @@ def apply_geometry_filter(labels: np.ndarray, segments: list[dict], zone_fn,
                           door_edge_window_frac: float = DOOR_EDGE_WINDOW_FRAC,
                           door_edge_band_px: int = DOOR_EDGE_BAND_PX,
                           min_door_width_px: int = MIN_DOOR_WIDTH_PX,
-                          min_region_area_px: int = MIN_REGION_AREA_PX):
+                          min_region_area_px: int = MIN_REGION_AREA_PX,
+                          door_metric_fn=None, door_verdict_fn=None,
+                          window_filter: bool = False):
     """Merge and filter one frame's opening detections.
 
     Returns (new_labels, new_segments, report). `new_labels` is a rewritten
@@ -202,12 +235,34 @@ def apply_geometry_filter(labels: np.ndarray, segments: list[dict], zone_fn,
     Windows are merged and filtered BEFORE doors, because the door edge-veto
     needs the surviving window regions to test against. A door can therefore
     never veto a window, only the reverse.
+
+    `door_metric_fn(region_mask) -> metric dict | None` is the LiDAR hook. Pass
+    None (the default, and what a run without --bag gets) and every door
+    verdict is 'unknown', which reproduces the pixel-only behaviour exactly.
+    See the module docstring for which rules a measurement may overturn.
+
+    `door_verdict_fn(metric) -> 'ok'|'bad'|'unknown'` defaults to
+    lidar_metrics.door_verdict with its module thresholds; the caller passes a
+    bound one so the CLI's --door-h-m/--door-w-m reach it without anybody
+    mutating module globals.
+
+    `window_filter` is OFF by default: windows are merged but never rejected.
+    Only doors are filtered. See the rule body for the measurement behind that.
+    Merging is not filtering and always runs -- it is what turns two fragments
+    of one bay into one detection.
     """
+    try:                                # imported as part of the package
+        from .lidar_metrics import door_verdict
+    except ImportError:                 # imported as a bare module by path
+        from lidar_metrics import door_verdict
+    if door_verdict_fn is None:
+        door_verdict_fn = door_verdict
+
     h, w = labels.shape
     by_id = {int(s["id"]): s for s in segments}
     floor = np.isin(labels, [int(s["id"]) for s in segments if s.get("zone") == "floor"])
 
-    report = {"merged": {}, "rejected": {}, "kept": {}}
+    report = {"merged": {}, "rejected": {}, "kept": {}, "rescued": {}}
     new_labels = labels.copy()
     out_segments = []
     consumed: set[int] = set()      # a record for this id has been emitted or replaced
@@ -250,9 +305,18 @@ def apply_geometry_filter(labels: np.ndarray, segments: list[dict], zone_fn,
         ys = np.nonzero(region.any(axis=1))[0]
         h_ratio = (ys.max() - ys.min() + 1) / float(h)
         gap = floor_gap(region, floor)
-        if 0 <= gap <= floor_tol_px and h_ratio < glass_wall_h_ratio:
+        if window_filter and 0 <= gap <= floor_tol_px and h_ratio < glass_wall_h_ratio:
             # Standing on the floor but far too short to be a glazed wall --
             # a sliver of frame, a reflection, or a low panel.
+            #
+            # OFF BY DEFAULT since the Mask2Former switch. It was rejecting
+            # real glazing: session 9 frame 5's right-hand bay measures
+            # h_ratio 0.577 against a 0.60 threshold whose own comment warned
+            # it separated by only 0.08 on one session. Mask2Former is a much
+            # better window detector than SAM+CLIP was, so the rule is now
+            # subtracting more than it adds -- and unlike a door, a window has
+            # no metric check to arbitrate, because glazing returns no LiDAR.
+            # --window-filter puts it back.
             reject(region, members, "window_floor_contact_not_glass_wall",
                    {"h_ratio": round(h_ratio, 3), "floor_gap_px": gap,
                     "needed_h_ratio": glass_wall_h_ratio})
@@ -271,40 +335,76 @@ def apply_geometry_filter(labels: np.ndarray, segments: list[dict], zone_fn,
     # ---- 2. doors: merge, then rules 3a-3d against the SURVIVING windows ----
     door_mask = np.isin(labels, [i for i, s in by_id.items() if s["top_class"] == "door"])
     survivors = []
+    rescue_mask = np.zeros_like(door_mask)      # pixels a LiDAR rescue saved
+    n_metric = {"ok": 0, "bad": 0, "unknown": 0}
+    n_abstain: dict[str, int] = {}      # why a measurement was not available
     for region in merge_regions(door_mask, dilate_px):
         members = members_of(region)
         if not members:
-            continue
-        if region.sum() < min_region_area_px:
-            reject(region, members, "door_below_min_area", {"area_px": int(region.sum())})
             continue
         ys = np.nonzero(region.any(axis=1))[0]
         xs = np.nonzero(region.any(axis=0))[0]
         h_ratio = (ys.max() - ys.min() + 1) / float(h)
         width_px = int(xs.max() - xs.min() + 1)
+        area_px = int(region.sum())
         gap = floor_gap(region, floor)
         lf, rf = door_edge_window_fraction(region, all_window_mask, door_edge_band_px)
-        detail = {"h_ratio": round(h_ratio, 3), "width_px": width_px,
-                  "floor_gap_px": gap, "window_left": round(lf, 3),
-                  "window_right": round(rf, 3)}
 
-        # 3a -- bay-edge frame fragment
+        # Measured BEFORE any rule runs, so the same number is available to
+        # overrule a rejection and to justify a rejection. Cheap: one boolean
+        # index into this frame's already-projected returns.
+        metric = door_metric_fn(region) if door_metric_fn is not None else None
+        verdict = door_verdict_fn(metric)
+        n_metric[verdict] += 1
+        if verdict == "unknown" and metric is not None:
+            why = metric.get("reason", "unspecified")
+            n_abstain[why] = n_abstain.get(why, 0) + 1
+
+        detail = {"h_ratio": round(h_ratio, 3), "width_px": width_px,
+                  "area_px": area_px, "floor_gap_px": gap,
+                  "window_left": round(lf, 3), "window_right": round(rf, 3),
+                  "lidar_verdict": verdict, "lidar": metric}
+
+        # 3z -- the LiDAR says this is not door-sized. Fires ahead of the pixel
+        # rules on purpose: a real measurement beats every proxy below it, and
+        # a candidate killed here is killed for a reason that survives being
+        # looked at in metres.
+        if verdict == "bad":
+            reject(region, members, "door_metric_dims", detail)
+            continue
+        # 3a -- bay-edge frame fragment. Not a size question: a metrically
+        # door-sized strip at the edge of a glazed bay is still a reveal.
         if max(lf, rf) > door_edge_window_frac:
             reject(region, members, "door_window_edge_adjacent", detail)
             continue
-        # 3d -- sliver
-        if width_px < min_door_width_px:
-            reject(region, members, "door_below_min_width", detail)
+
+        # 3b/3c/3d -- the depth-dependent pixel rules. A door-sized measurement
+        # overturns any of them; without one they decide as before.
+        fired = [rule for cond, rule in (
+            (area_px < min_region_area_px, "door_below_min_area"),
+            (width_px < min_door_width_px, "door_below_min_width"),
+            (h_ratio >= glass_wall_h_ratio, "door_taller_than_glass_wall")) if cond]
+        killed = [r for r in fired
+                  if not (verdict == "ok" and r in RESCUABLE_DOOR_RULES)]
+        if killed:
+            reject(region, members, killed[0], detail)
             continue
-        # 3b -- a door has to start at floor level
+
+        # 3e -- a door has to start at floor level. Last, and never rescued:
+        # "is it standing on the ground" is not a size question, and it is the
+        # rule that keeps wall-mounted panels and hatches out.
         if not (0 <= gap <= floor_tol_px):
             reject(region, members, "door_not_floor_standing", detail)
             continue
-        # 3c -- taller than a glazed wall means it is not a door
-        if h_ratio >= glass_wall_h_ratio:
-            reject(region, members, "door_taller_than_glass_wall", detail)
-            continue
+
+        if fired:
+            rescue_mask |= region
+            detail = {**detail, "rescued_from": fired}
+            for rule in fired:
+                report["rescued"][rule] = report["rescued"].get(rule, 0) + 1
         survivors.append((region, members, detail))
+    report["metric_verdicts"] = n_metric
+    report["metric_abstentions"] = n_abstain
 
     # 3f -- re-merge whatever survived, in case a real door was split and the
     # fragments only became adjacent after their neighbours were removed.
@@ -312,9 +412,6 @@ def apply_geometry_filter(labels: np.ndarray, segments: list[dict], zone_fn,
         surv_mask = np.zeros_like(door_mask)
         for region, _m, _d in survivors:
             surv_mask |= region
-        detail_by_pixel = {}
-        for region, _m, d in survivors:
-            detail_by_pixel[id(region)] = d
         remerged = [r for r in merge_regions(surv_mask, dilate_px) if r.any()]
         report["merged"]["door"] = len(remerged)
         for region in remerged:
@@ -329,6 +426,15 @@ def apply_geometry_filter(labels: np.ndarray, segments: list[dict], zone_fn,
                 "h_ratio": round((ys.max() - ys.min() + 1) / float(h), 3),
                 "width_px": int(xs.max() - xs.min() + 1),
                 "floor_gap_px": gap, "touches_floor": bool(0 <= gap <= floor_tol_px)}
+            # Re-measured on the merged region rather than copied from one of
+            # its parts: after a merge the extent, and therefore the metric
+            # size, is a different number from any fragment's.
+            if door_metric_fn is not None:
+                metric = door_metric_fn(region)
+                rec["geometry"]["lidar"] = metric
+                rec["geometry"]["lidar_verdict"] = door_verdict_fn(metric)
+            if rescue_mask[region].any():
+                rec["geometry"]["rescued_by_lidar"] = True
             out_segments.append(rec)
             new_labels[region] = next_id
             next_id += 1

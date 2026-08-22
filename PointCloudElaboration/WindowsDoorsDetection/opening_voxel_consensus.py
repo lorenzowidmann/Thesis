@@ -79,22 +79,26 @@ sys.path.insert(0, str(_ROOT / "SensorFusionLoader"))
 from rig_calibration import load_rig_calibration  # noqa: E402
 from projection import project_lidar_to_camera  # noqa: E402
 
-# project_to_flir.py is imported ONLY for nearest_clouds_for_targets (its
-# one-pass bag reader). Import order matters: that module runs its own
+# EmissivityCalculation is on the path only so that lidar_metrics can fall back
+# to project_to_flir.nearest_clouds_for_targets under --cloud-source registered.
+# Import order matters: project_to_flir runs its own
 # sys.path.insert(0, "../Calibration") at import time and then does
 # `from rig_calibration import ...`. That directory does not exist in this
 # repo, so the insert is a no-op -- but the import above has already put
 # rig_calibration and projection in sys.modules, so its top-level imports
 # resolve to SensorFusionLoader's copies and it loads cleanly. Do not move
-# these two lines above the SensorFusionLoader import.
+# this above the SensorFusionLoader import.
 sys.path.insert(0, str(_ROOT / "EmissivityCalculation"))
-from project_to_flir import nearest_clouds_for_targets  # noqa: E402
+# ../LivoxLidarOdometryLoader, the raw-cloud reader (numpy + rosbags only, no
+# torch), reached through lidar_metrics.load_clouds.
+_LOADER_DIR = _ROOT / "PointCloudElaboration" / "LivoxLidarOdometryLoader"
 
 # Bare-module imports, not `from openings import ...`: the package __init__
 # pulls in classifier.py (torch), which the rosbags venv does not have.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "openings"))
 from table import OTHER_CLASS  # noqa: E402
 from zone_prior import restrict_opening_ranking  # noqa: E402
+import lidar_metrics as lm  # noqa: E402
 
 # Fixed colours for the PLY, so an opening map always reads the same way in
 # CloudCompare/Meshlab regardless of what the session contains.
@@ -152,7 +156,21 @@ def parse_args():
                    help="Default <session-dir>/opening_map_consensus.")
     p.add_argument("--calibration", default=None, metavar="YAML",
                    help="Default: SensorFusionLoader/rig_calibration.yaml.")
-    p.add_argument("--odom-topic", default="/cloud_registered")
+    p.add_argument("--cloud-source", choices=("raw", "registered"),
+                   default=lm.DEFAULT_CLOUD_SOURCE,
+                   help="Where the LiDAR comes from, and it decides whether this stage "
+                        "can produce anything at all. 'raw' (default) rebuilds world "
+                        "clouds from /livox/lidar + /Odometry via "
+                        "../LivoxLidarOdometryLoader. 'registered' reads FAST-LIO's "
+                        "/cloud_registered, which on session 9 is cropped to a 35-deg "
+                        "cone from 4 m: both window bays fall outside it, get zero "
+                        "returns, and no window voxel can exist no matter what stage 1 "
+                        "found.")
+    p.add_argument("--lidar-topic", default=lm.RAW_LIDAR_TOPIC, metavar="TOPIC")
+    p.add_argument("--pose-topic", default=lm.POSE_TOPIC, metavar="TOPIC")
+    p.add_argument("--odom-topic", dest="registered_topic", default=lm.REGISTERED_TOPIC,
+                   help="Registered-cloud topic, --cloud-source registered. Named "
+                        "--odom-topic for backwards compatibility; it is a misnomer.")
     p.add_argument("--store", default="ROS2_HUMBLE", metavar="NAME")
     p.add_argument("--every-n", type=int, default=1, metavar="N")
     p.add_argument("--limit", type=int, default=None, metavar="N")
@@ -261,10 +279,17 @@ def main():
         return 1
     print(f"{len(work)} frame(s) with opening maps, voxel {args.voxel * 100:.0f} cm")
 
-    print(f"Reading LiDAR scans from {Path(args.bag).name} ...")
-    clouds = nearest_clouds_for_targets(
+    src = (f"{args.lidar_topic} + {args.pose_topic}" if args.cloud_source == "raw"
+           else args.registered_topic)
+    print(f"Reading LiDAR scans from {Path(args.bag).name} [{args.cloud_source}: {src}] ...")
+    clouds = lm.load_clouds(
         Path(args.bag), [t["lidar"]["timestamp_zedclock"] for t in work],
-        args.odom_topic, args.store)
+        store=args.store, source=args.cloud_source, lidar_topic=args.lidar_topic,
+        registered_topic=args.registered_topic, pose_topic=args.pose_topic,
+        loader_dir=_LOADER_DIR)
+    npts = [len(c[1]) for c in clouds if c is not None]
+    if npts:
+        print(f"  {len(npts)} scan(s), {min(npts)}-{max(npts)} points each")
 
     votes = defaultdict(Counter)        # voxel -> class -> pooled weight
     obs_frames = defaultdict(set)       # voxel -> {frame stem}

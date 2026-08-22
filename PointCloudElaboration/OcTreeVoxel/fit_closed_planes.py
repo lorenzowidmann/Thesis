@@ -61,6 +61,12 @@ DEFAULT_BAG = Path(
 )
 
 
+# Every generated file goes here, never next to the sources -- keeps the module
+# folder clean and lets one .gitignore rule cover the whole pipeline's output.
+HERE = Path(__file__).resolve().parent
+OUT_DIR = HERE / "OcTreeVoxel_out"
+
+
 def read_pointcloud2(msg):
     # x,y,z as float32 at offsets 0,4,8; slice by point_step to skip extra fields
     step = msg.point_step
@@ -624,8 +630,11 @@ def main():
     ap.add_argument("--close-retry-min-density-ratio", type=float, default=0.4,
                     help="reject a retry fit whose point density (inliers/area) is below "
                          "this fraction of the confirmed real walls' density")
-    ap.add_argument("--out", type=Path, default=Path("planes.json"))
+    ap.add_argument("--out", type=Path, default=OUT_DIR / "planes.json",
+                    help="default: OcTreeVoxel_out/planes.json")
     args = ap.parse_args()
+
+    args.out.parent.mkdir(parents=True, exist_ok=True)
 
     xyz = load_merged_cloud(args.bag, args.topic, args.store)
 

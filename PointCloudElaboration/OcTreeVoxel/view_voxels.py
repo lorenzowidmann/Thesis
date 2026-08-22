@@ -51,6 +51,7 @@ from pathlib import Path
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
+OUT_DIR = HERE / "OcTreeVoxel_out"  # where aligned_octree.py writes its results
 
 # Voxels are colored by point count on a perceptually-uniform colormap,
 # linear by default (--log-color switches to log10(count) -- useful when one
@@ -283,9 +284,9 @@ def make_orbit_gif(pl, path, n_frames=36, factor=2.5, viewup=(0.0, 0.0, 1.0)):
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--voxels", type=Path, default=HERE / "voxels.npz")
-    ap.add_argument("--transform", type=Path, default=HERE / "transform.json")
-    ap.add_argument("--planes-aligned", type=Path, default=HERE / "planes_aligned.json",
+    ap.add_argument("--voxels", type=Path, default=OUT_DIR / "voxels.npz")
+    ap.add_argument("--transform", type=Path, default=OUT_DIR / "transform.json")
+    ap.add_argument("--planes-aligned", type=Path, default=OUT_DIR / "planes_aligned.json",
                     help="closed box overlay, output of aligned_octree.py "
                          "(already in the aligned frame -- see "
                          "align_and_reclose_planes for why this isn't just "

@@ -1,10 +1,22 @@
-"""The door/window/other class list and its CLIP prompts, loaded from
+"""The door/window/other class list and its ADE20K mapping, loaded from
 opening_table.csv.
 
 Same role EmissivityCalculation/emissivity/table.py plays for materials: the
-`prompt` column is what the zero-shot classifier scores, so the classes the
-model can predict always stay in sync with the file, and a taxonomy change
-(door_open/door_closed, window_shutter, ...) is a CSV edit, not a code edit.
+taxonomy lives in the file, so a change (door_open/door_closed,
+window_shutter, ...) is a CSV edit, not a code edit.
+
+Columns
+-------
+class   the class name segments.json and the consensus stage use
+ade     the ADE20K-150 label Mask2Former must emit for a region to become this
+        class, matched on the first comma-separated synonym, lowercased.
+        Blank means "no ADE class maps here" -- which is correct for `other`,
+        the catch-all every unmapped ADE label falls into.
+prompt  the CLIP prompt. DEAD as of the Mask2Former switch: stage 1 no longer
+        runs a zero-shot classifier. Kept because the column documents what
+        each class means, and because openings/classifier.py still reads it if
+        anyone wants to run the old path for comparison.
+notes   free text.
 
 Two deliberate differences from EmissivityTable:
 
@@ -35,6 +47,7 @@ class OpeningRecord:
     cls: str
     prompt: str
     notes: str
+    ade: str = ""
 
 
 class OpeningTable:
@@ -57,7 +70,8 @@ class OpeningTable:
                     f"Duplicate class {name!r} in {path}. One row is one class is one "
                     "prompt -- multi-prompt pooling is not implemented.")
             self._records[name] = OpeningRecord(
-                cls=name, prompt=str(row["prompt"]), notes=str(row["notes"]))
+                cls=name, prompt=str(row["prompt"]), notes=str(row["notes"]),
+                ade=str(row.get("ade") or "").strip().lower())
 
         if OTHER_CLASS not in self._records:
             raise ValueError(
@@ -72,6 +86,32 @@ class OpeningTable:
     @property
     def prompts(self) -> list[str]:
         return [r.prompt for r in self._records.values()]
+
+    @property
+    def ade_to_class(self) -> dict[str, str]:
+        """{ade label -> our class}, for the classes that declare one.
+
+        Deliberately NOT defaulted: an ADE label absent from this dict is
+        `other` by omission, which is what makes `other` a genuine catch-all
+        over all 150 ADE classes instead of one CLIP prompt trying to cover
+        walls, floors, radiators, pillars, people and clutter at once. That
+        prompt was the weakest part of the old pipeline.
+
+        Several ADE labels may map to one class -- `ade` accepts a
+        semicolon-separated list -- but a label may not map to two classes,
+        which would make the raster ambiguous.
+        """
+        out: dict[str, str] = {}
+        for rec in self._records.values():
+            for name in (n.strip() for n in rec.ade.split(";")):
+                if not name:
+                    continue
+                if name in out and out[name] != rec.cls:
+                    raise ValueError(
+                        f"ADE label {name!r} is claimed by both {out[name]!r} and "
+                        f"{rec.cls!r}. One ADE label maps to at most one class.")
+                out[name] = rec.cls
+        return out
 
     @property
     def opening_classes(self) -> list[str]:

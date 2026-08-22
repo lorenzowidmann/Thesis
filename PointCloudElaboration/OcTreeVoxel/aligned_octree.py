@@ -44,6 +44,12 @@ import numpy as np
 from fit_closed_planes import canonical_normal_offset, close_geometry, load_merged_cloud
 from octree import build_octree, leaf_voxels, level_counts, verify_nonempty, voxelize, voxelize_octree
 
+# Every generated file goes here, never next to the sources -- keeps the module
+# folder clean and lets one .gitignore rule cover the whole pipeline's output.
+HERE = Path(__file__).resolve().parent
+OUT_DIR = HERE / "OcTreeVoxel_out"
+
+
 
 def _axis_of(plane):
     """Index (0/1/2 = X/Y/Z) of the world axis a plane's normal is nearest
@@ -179,7 +185,7 @@ def align_and_reclose_planes(planes, R, t):
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--planes", type=Path, default=Path("planes.json"),
+    ap.add_argument("--planes", type=Path, default=OUT_DIR / "planes.json",
                     help="output of fit_closed_planes.py")
     ap.add_argument("--bag", type=Path, default=None,
                     help="rosbag2 folder (default: the 'bag' field recorded in --planes)")
@@ -196,14 +202,19 @@ def main():
                          "power-of-two octree lattice, since an arbitrary size like "
                          "0.15 generally isn't root_extent/2**depth for any integer "
                          "depth -- build_octree/voxelize_octree are skipped in this case")
-    ap.add_argument("--voxels-out", type=Path, default=Path("voxels.npz"))
-    ap.add_argument("--transform-out", type=Path, default=Path("transform.json"))
-    ap.add_argument("--planes-aligned-out", type=Path, default=Path("planes_aligned.json"),
+    ap.add_argument("--voxels-out", type=Path, default=OUT_DIR / "voxels.npz",
+                    help="default: OcTreeVoxel_out/voxels.npz")
+    ap.add_argument("--transform-out", type=Path, default=OUT_DIR / "transform.json",
+                    help="default: OcTreeVoxel_out/transform.json")
+    ap.add_argument("--planes-aligned-out", type=Path, default=OUT_DIR / "planes_aligned.json",
                     help="closed box re-derived in the aligned frame (see "
                          "align_and_reclose_planes) -- this is what view_voxels.py "
                          "overlays; it is NOT just planes.json rotated by transform.json, "
                          "see the function docstring for why that would carry a small tilt")
     args = ap.parse_args()
+
+    for out in (args.voxels_out, args.transform_out, args.planes_aligned_out):
+        out.parent.mkdir(parents=True, exist_ok=True)
 
     record = json.loads(args.planes.read_text())
     planes = record["planes"]
